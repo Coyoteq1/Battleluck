@@ -1,35 +1,46 @@
 {
   "enabled": true,
-  "google_ai": {
-    "api_key": "",
-    "model": "gemini-2.5-flash",
-    "fallback_models": [
-      "gemini-2.0-flash",
-      "gemini-1.5-flash"
-    ],
-    "max_requests_per_second": 10,
-    "temperature": 0.8,
-    "max_tokens": 300
-  },
-  "ai_sidecar": {
+  "provider": "llama",
+  "direct_chat_max_tokens": 512,
+  "llama_api": {
     "enabled": true,
-    "base_url": "https://ais-pre-ddtfjbzbgpc2mlkz7nqvra-782381585235.europe-west2.run.app",
-    "auth_key": "",
-    "timeout_seconds": 10
+    "api_key": "",
+    "base_url": "http://127.0.0.1:11434",
+    "model": "qwen2.5:0.5b",
+    "max_requests_per_second": 2,
+    "temperature": 0.4,
+    "max_tokens": 512,
+    "timeout_seconds": 30
   },
   "messaging": {
     "message_cooldown_seconds": 30,
     "tip_cooldown_minutes": 5,
     "context_retention_minutes": 30,
-    "auto_tips_enabled": true,
-    "welcome_messages_enabled": true,
-    "match_summaries_enabled": true,
-    "discord_webhook_url": ""
+    "auto_tips_enabled": false,
+    "welcome_messages_enabled": false,
+    "match_summaries_enabled": false,
+    "show_holograms": false
   },
   "privacy": {
     "opt_out_by_default": false,
     "allow_player_toggle": true,
-    "store_conversation_history": true,
-    "max_conversation_history_size": 20
+    "store_conversation_history": false,
+    "max_conversation_history_size": 0
+  },
+  "event_authoring": {
+    "enabled": true,
+    "max_actions_per_event": 50,
+    "config_edit_max_tokens": 1024,
+    "use_actions_catalog": true,
+    "pending_operation_minutes": 10
+  },
+  "projectm_aigroup": {
+    "enabled": false,
+    "auto_execute": false,
+    "snapshot_interval_seconds": 15,
+    "max_units": 10,
+    "max_players": 8,
+    "min_confidence": 0.65,
+    "allowed_actions": []
   }
 }

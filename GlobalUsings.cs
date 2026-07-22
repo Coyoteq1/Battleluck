@@ -1,50 +1,52 @@
-// ── System ───────────────────────────────────────────────────────────
 global using System;
+global using System.Collections;
 global using System.Collections.Concurrent;
 global using System.Collections.Generic;
+global using System.Globalization;
 global using System.IO;
 global using System.Linq;
-global using System.Net;
-global using System.Net.Http;
 global using System.Reflection;
 global using System.Security.Cryptography;
 global using System.Text;
 global using System.Text.Json;
 global using System.Text.Json.Serialization;
+global using System.Threading;
 global using System.Threading.Tasks;
 
-// ── BepInEx / Harmony ───────────────────────────────────────────────
 global using BepInEx;
 global using BepInEx.Logging;
-global using BepInEx.Unity.IL2CPP;
 global using HarmonyLib;
-
-// ── HookDOTS ────────────────────────────────────────────────────────
-global using HookDOTS;
-global using HookDOTS.API;
-global using HookDOTS.API.Attributes;
-
-// ── VampireCommandFramework ─────────────────────────────────────────
-global using VampireCommandFramework;
-
-// ── ProjectM (V Rising) ─────────────────────────────────────────────
+global using Il2CppInterop.Runtime;
+global using Il2CppInterop.Runtime.Runtime;
 global using ProjectM;
-global using ProjectM.CastleBuilding;
-global using ProjectM.Gameplay.WarEvents;
 global using ProjectM.Network;
-global using ProjectM.Scripting;
-global using ProjectM.Shared;
-
-// ── Stunlock ────────────────────────────────────────────────────────
 global using Stunlock.Core;
-
-// ── Unity ───────────────────────────────────────────────────────────
 global using Unity.Collections;
 global using Unity.Entities;
+global using Unity.Jobs;
 global using Unity.Mathematics;
+global using Unity.Profiling;
 global using Unity.Transforms;
 global using UnityEngine;
-global using UnityEngine.InputSystem;
+global using VampireCommandFramework;
 
-// ── Il2Cpp ──────────────────────────────────────────────────────────
-global using Il2CppInterop.Runtime;
+global using BattleLuck.Core;
+global using BattleLuck.Models;
+global using BattleLuck.Utilities;
+global using BattleLuck.ECS;
+global using BattleLuck.ECS.Actions;
+global using BattleLuck.ECS.Actions.Components;
+global using BattleLuck.ECS.Events;
+global using BattleLuck.ECS.Queries;
+// global using BattleLuck.ECS.Sessions; // Sessions folder is empty
+global using BattleLuck.Services;
+global using BattleLuck.Services.AI;
+global using BattleLuck.Services.Flow;
+global using BattleLuck.Services.Modes;
+global using BattleLuck.Services.Npc;
+global using BattleLuck.Services.Runtime;
+global using BattleLuck.Services.Zone;
+global using BattleLuck.Core.Loaders;
+global using BattleLuck.Core.Validation;
+
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("BattleLuck.Tests")]

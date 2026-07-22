@@ -1,0 +1,34 @@
+{
+  "settings": {
+    "gearLevel": 90,
+    "healOnApply": true,
+    "clearInventoryFirst": true
+  },
+  "blood": {
+    "type": "Warrior",
+    "quality": 80.0,
+    "value": 100.0
+  },
+  "armors": {
+    "chest": "Item_Chest_T08_DarkSilver_Warrior",
+    "legs": "Item_Legs_T08_DarkSilver_Warrior",
+    "gloves": "Item_Gloves_T08_DarkSilver_Warrior",
+    "boots": "Item_Boots_T08_DarkSilver_Warrior",
+    "magicSource": "Item_MagicSource_General_T08_Storm"
+  },
+  "weapons": [
+    { "prefab": "Item_Weapon_Sword_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Axe_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Mace_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Spear_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Crossbow_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Slashers_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Reaper_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Pistols_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_GreatSword_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Whip_T08_Sanguine", "amount": 1 }
+  ],
+  "items": [],
+  "abilities": {},
+  "passiveSpells": []
+}

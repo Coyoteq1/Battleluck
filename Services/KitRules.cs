@@ -1,103 +1,94 @@
-using Stunlock.Core;
+using System.Text.Json.Serialization;
 
 /// <summary>
-/// Item -> kit grant rules for crafting completion hooks.
-///
-/// Rules are loaded from config/BattleLuck/kit_grant_rules.json.
-/// Use either itemGuid or itemPrefab in each rule entry.
+/// Configuration model for kit_grant_rules.json.
+/// Maps crafted item prefabs to kit IDs that should be granted on craft completion.
 /// </summary>
 public static class KitRules
 {
-    static readonly Dictionary<PrefabGUID, string> _rules = new();
-    static bool _loaded;
+    static readonly object _lock = new();
+    static KitGrantRulesConfig? _config;
 
-    public static bool TryGetKitForItem(PrefabGUID item, out string kitId)
+    /// <summary>
+    /// Load the kit grant rules configuration.
+    /// </summary>
+    public static KitGrantRulesConfig Load()
     {
-        EnsureLoaded();
-        return _rules.TryGetValue(item, out kitId!);
-    }
-
-    public static void Reload()
-    {
-        _loaded = false;
-        _rules.Clear();
-        EnsureLoaded();
-    }
-
-    static void EnsureLoaded()
-    {
-        if (_loaded) return;
-        _loaded = true;
-
-        var path = Path.Combine(ConfigLoader.ConfigRoot, "kit_grant_rules.json");
-        if (!File.Exists(path))
+        lock (_lock)
         {
-            BattleLuckPlugin.LogInfo($"[KitRules] No kit grant rules file found at {path}. Craft grants are disabled until configured.");
-            return;
-        }
+            if (_config != null)
+                return _config;
 
-        try
-        {
-            var json = File.ReadAllText(path);
-            var config = JsonSerializer.Deserialize<KitGrantRulesConfig>(json, new JsonSerializerOptions
+            var path = System.IO.Path.Combine(ConfigLoader.ConfigRoot, "kit_grant_rules.json");
+            if (!System.IO.File.Exists(path))
             {
-                PropertyNameCaseInsensitive = true,
-                ReadCommentHandling = JsonCommentHandling.Skip,
-                AllowTrailingCommas = true
-            });
-
-            if (config == null || !config.Enabled || config.Rules.Count == 0)
-                return;
-
-            foreach (var rule in config.Rules)
-            {
-                if (string.IsNullOrWhiteSpace(rule.KitId))
-                    continue;
-
-                PrefabGUID itemGuid;
-                if (rule.ItemGuid.HasValue && rule.ItemGuid.Value != 0)
-                {
-                    itemGuid = new PrefabGUID(rule.ItemGuid.Value);
-                }
-                else if (!string.IsNullOrWhiteSpace(rule.ItemPrefab) && PrefabHelper.TryGetPrefabGuid(rule.ItemPrefab, out var resolved))
-                {
-                    itemGuid = resolved;
-                }
-                else
-                {
-                    BattleLuckPlugin.LogWarning($"[KitRules] Skipping invalid rule (kit={rule.KitId}): missing/invalid itemGuid and itemPrefab.");
-                    continue;
-                }
-
-                _rules[itemGuid] = rule.KitId;
+                BattleLuckPlugin.LogInfo($"[KitRules] No kit_grant_rules.json found at {path}, returning empty config.");
+                _config = new KitGrantRulesConfig();
+                return _config;
             }
 
-            BattleLuckPlugin.LogInfo($"[KitRules] Loaded {_rules.Count} item->kit rule(s).");
+            try
+            {
+                var json = System.IO.File.ReadAllText(path);
+                _config = System.Text.Json.JsonSerializer.Deserialize<KitGrantRulesConfig>(json, ConfigLoader.JsonOptions)
+                    ?? new KitGrantRulesConfig();
+            }
+            catch (System.Exception ex)
+            {
+                BattleLuckPlugin.LogWarning($"[KitRules] Failed to load kit_grant_rules.json: {ex.Message}");
+                _config = new KitGrantRulesConfig();
+            }
+
+            return _config;
         }
-        catch (Exception ex)
+    }
+
+    /// <summary>
+    /// Check if a crafted item grants a kit, and return the kit ID if so.
+    /// </summary>
+    public static bool TryGetKitForItem(PrefabGUID craftedItem, out string kitId)
+    {
+        kitId = "";
+        var config = Load();
+
+        if (config.Rules == null)
+            return false;
+
+        foreach (var rule in config.Rules)
         {
-            BattleLuckPlugin.LogWarning($"[KitRules] Failed to load rules: {ex.Message}");
+            if (rule.ItemPrefabGuid == craftedItem.GuidHash)
+            {
+                kitId = rule.KitId;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Clear the cached configuration (used on reload).
+    /// </summary>
+    public static void ClearCache()
+    {
+        lock (_lock)
+        {
+            _config = null;
         }
     }
+}
 
-    sealed class KitGrantRulesConfig
-    {
-        [JsonPropertyName("enabled")]
-        public bool Enabled { get; set; } = true;
+public sealed class KitGrantRulesConfig
+{
+    [JsonPropertyName("rules")]
+    public List<KitGrantRule> Rules { get; set; } = new();
+}
 
-        [JsonPropertyName("rules")]
-        public List<KitGrantRule> Rules { get; set; } = new();
-    }
+public sealed class KitGrantRule
+{
+    [JsonPropertyName("itemPrefabGuid")]
+    public int ItemPrefabGuid { get; set; }
 
-    sealed class KitGrantRule
-    {
-        [JsonPropertyName("itemGuid")]
-        public int? ItemGuid { get; set; }
-
-        [JsonPropertyName("itemPrefab")]
-        public string? ItemPrefab { get; set; }
-
-        [JsonPropertyName("kitId")]
-        public string KitId { get; set; } = "";
-    }
+    [JsonPropertyName("kitId")]
+    public string KitId { get; set; } = "";
 }

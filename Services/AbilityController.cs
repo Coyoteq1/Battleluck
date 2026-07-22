@@ -51,7 +51,7 @@ public static class AbilityController
         ["Frost"]    = new SchoolSpellSet { Q = Prefabs.AB_Frost_FrostBat,         E = Prefabs.AB_Frost_CrystalLance,    R = Prefabs.AB_Frost_IceNova },
         ["Chaos"]    = new SchoolSpellSet { Q = Prefabs.AB_Chaos_Volley,           E = Prefabs.AB_Chaos_ChaosBarrage,    R = Prefabs.AB_Chaos_Void },
         ["Unholy"]   = new SchoolSpellSet { Q = Prefabs.AB_Unholy_CorruptedSkull,  E = Prefabs.AB_Unholy_Soulburn,       R = Prefabs.AB_Unholy_WardOfTheDamned },
-        ["Storm"]    = new SchoolSpellSet { Q = Prefabs.AB_Storm_BallLightning,    E = Prefabs.AB_Storm_Discharge,       R = Prefabs.AB_Storm_PolarityShift },
+        ["Storm"]    = new SchoolSpellSet { Q = Prefabs.AB_Storm_BallLightning,    E = Prefabs.AB_Storm_Discharge,       R = Prefabs.AB_Storm_EyeOfTheStorm },
         ["Illusion"] = new SchoolSpellSet { Q = Prefabs.AB_Illusion_SpectralWolf,  E = Prefabs.AB_Illusion_MistTrance,   R = Prefabs.AB_Illusion_PhantomAegis },
     };
 
@@ -60,7 +60,6 @@ public static class AbilityController
     {
         ["bloodbath"]  = "Blood",
         ["colosseum"]  = "Chaos",
-        ["gauntlet"]   = "Storm",
         ["siege"]      = "Unholy",
         ["trials"]     = "Frost",
     };
@@ -330,7 +329,12 @@ public static class AbilityController
     /// and configuring its ReplaceAbilityOnSlotBuff buffer.
     /// In V Rising 1.1, ReplaceAbilityOnSlotBuff lives on BUFF ENTITIES, not on the character.
     /// </summary>
-    public static void SetSpellOnSlot(Entity playerCharacter, int slot, PrefabGUID abilityGroup)
+    public static void SetSpellOnSlot(
+        Entity playerCharacter,
+        int slot,
+        PrefabGUID abilityGroup,
+        bool copyCooldown = true,
+        int priority = 0)
     {
         var em = VRisingCore.EntityManager;
         var userEntity = playerCharacter.GetUserEntity();
@@ -365,8 +369,8 @@ public static class AbilityController
                         {
                             Slot = slot,
                             NewGroupId = abilityGroup,
-                            CopyCooldown = true,
-                            Priority = 0
+                            CopyCooldown = copyCooldown,
+                            Priority = priority
                         });
 
                         // Make buff persistent
@@ -389,15 +393,70 @@ public static class AbilityController
         BattleLuckPlugin.LogWarning($"[AbilityController] Failed to find VBloodAbilityReplace buff entity for slot {slot}.");
     }
 
-    /// <summary>Clear all custom ability replacements.</summary>
-    public static void ClearAbilitySlots(Entity equipmentEntity)
+    /// <summary>
+    /// Remove every BattleLuck-style VBlood ability replacement buff from a
+    /// player. The native/base loadout becomes active again immediately; saved
+    /// replacements can then be restored without overlapping event slots.
+    /// </summary>
+    public static int ClearAbilitySlots(Entity playerCharacter)
     {
         var em = VRisingCore.EntityManager;
-        if (em.HasBuffer<ReplaceAbilityOnSlotBuff>(equipmentEntity))
+        if (!playerCharacter.Exists() || !em.HasBuffer<BuffBuffer>(playerCharacter))
+            return 0;
+
+        var buffs = em.GetBuffer<BuffBuffer>(playerCharacter);
+        var toDestroy = new List<Entity>();
+        for (var i = 0; i < buffs.Length; i++)
         {
-            var buffer = em.GetBuffer<ReplaceAbilityOnSlotBuff>(equipmentEntity);
-            buffer.Clear();
+            var entry = buffs[i];
+            if (entry.PrefabGuid.GuidHash != Prefabs.VBloodAbilityReplace.GuidHash)
+                continue;
+            if (entry.Entity.Exists())
+                toDestroy.Add(entry.Entity);
         }
+
+        var removed = 0;
+        foreach (var buffEntity in toDestroy.Distinct())
+        {
+            try
+            {
+                buffEntity.DestroyWithReason();
+                removed++;
+            }
+            catch (Exception ex)
+            {
+                BattleLuckPlugin.LogWarning($"[AbilityController] Failed to clear ability replacement buff {buffEntity.Index}:{buffEntity.Version}: {ex.Message}");
+            }
+        }
+
+        if (removed > 0)
+            BattleLuckPlugin.LogInfo($"[AbilityController] Cleared {removed} custom ability slot replacement(s) for {playerCharacter.GetSteamId()}.");
+        return removed;
+    }
+
+    /// <summary>Remove passive ability buffs so an event kit cannot stack with the player's old passives.</summary>
+    public static int ClearPassiveSpells(Entity playerCharacter)
+    {
+        var em = VRisingCore.EntityManager;
+        if (!playerCharacter.Exists() || !em.HasBuffer<BuffBuffer>(playerCharacter))
+            return 0;
+
+        var buffs = em.GetBuffer<BuffBuffer>(playerCharacter);
+        var prefabs = new HashSet<PrefabGUID>();
+        for (var i = 0; i < buffs.Length; i++)
+        {
+            var guid = buffs[i].PrefabGuid;
+            var name = PrefabHelper.GetLivePrefabName(guid) ?? PrefabHelper.GetName(guid) ?? string.Empty;
+            if (name.Contains("Passive", StringComparison.OrdinalIgnoreCase))
+                prefabs.Add(guid);
+        }
+
+        foreach (var prefab in prefabs)
+            playerCharacter.TryRemoveBuff(prefab);
+
+        if (prefabs.Count > 0)
+            BattleLuckPlugin.LogInfo($"[AbilityController] Cleared {prefabs.Count} passive spell buff(s) for {playerCharacter.GetSteamId()}.");
+        return prefabs.Count;
     }
 
     // ── Kit-driven ability assignment ────────────────────────────────────

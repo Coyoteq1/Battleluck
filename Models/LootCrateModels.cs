@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using Unity.Entities;
 using Unity.Mathematics;
+using Stunlock.Core;
 
 /// <summary>Config for loot crate spawning on the battle platform.</summary>
 public sealed class LootCrateConfig
@@ -17,6 +18,18 @@ public sealed class LootCrateConfig
     [JsonPropertyName("despawnAfterSec")]
     public float DespawnAfterSec { get; set; } = 10f;
 
+    [JsonPropertyName("spawnAtCenter")]
+    public bool SpawnAtCenter { get; set; } = true;
+
+    [JsonPropertyName("lockedUntilKills")]
+    public int LockedUntilKills { get; set; } = 3;
+
+    [JsonPropertyName("winnerOnly")]
+    public bool WinnerOnly { get; set; } = true;
+
+    [JsonPropertyName("containerPrefab")]
+    public string ContainerPrefab { get; set; } = "Chain_Container_WorldChest_Iron_01";
+
     [JsonPropertyName("crateTypes")]
     public List<CrateTypeConfig> CrateTypes { get; set; } = new();
 }
@@ -31,6 +44,9 @@ public sealed class CrateTypeConfig
 
     [JsonPropertyName("prefab")]
     public string Prefab { get; set; } = "";
+
+    [JsonPropertyName("amount")]
+    public int Amount { get; set; } = 1;
 }
 
 public sealed class CrateInstance

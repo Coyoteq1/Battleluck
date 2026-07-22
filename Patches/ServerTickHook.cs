@@ -1,64 +1,81 @@
-﻿using HarmonyLib;
+using System.Diagnostics;
+using HarmonyLib;
 using ProjectM;
-using ProjectM.Gameplay.WarEvents;
-
-/// <summary>
-/// One-shot initialization: hooks WarEventRegistrySystem.RegisterWarEventEntities
-/// which fires after the server world is fully ready (same pattern as Bloodcraft).
-/// </summary>
-[HarmonyPatch]
-internal static class InitializationHook
-{
-    [HarmonyPatch(typeof(WarEventRegistrySystem), nameof(WarEventRegistrySystem.RegisterWarEventEntities))]
-    [HarmonyPostfix]
-    static void RegisterWarEventEntitiesPostfix()
-    {
-        try
-        {
-            BattleLuckPlugin.TryInitializeCore();
-        }
-        catch (Exception ex)
-        {
-            BattleLuckPlugin.LogWarning($"[BattleLuck] Init failed: {ex.Message}");
-        }
-    }
-}
 
 /// <summary>
 /// Periodic tick: hooks BuffSystem_Spawn_Server.OnUpdate which fires every server frame.
 /// Drives zone detection, session ticks, and mode logic.
+///
+/// The one-shot initialization now lives in <see cref="InitializationPatch"/>; this
+/// hook also acts as a safety-net fallback in case that patch did not fire.
 /// </summary>
 [HarmonyPatch]
 internal static class ServerTickHook
 {
-    static DateTime _lastTick = DateTime.UtcNow;
+    static readonly Stopwatch Stopwatch = Stopwatch.StartNew();
+    static double _lastTickSeconds;
+    static double _nextInitRetryAtSeconds;
+    const double InitRetryIntervalSeconds = 5.0;
+    const float MaxDeltaSeconds = 0.5f;
 
     [HarmonyPatch(typeof(BuffSystem_Spawn_Server), nameof(BuffSystem_Spawn_Server.OnUpdate))]
     [HarmonyPostfix]
     static void OnUpdatePostfix()
     {
-        // Fallback init: if the WarEvent hook didn't fire, try here
-        if (!BattleLuckPlugin.IsInitialized)
-        {
-            try { BattleLuckPlugin.TryInitializeCore(); }
-            catch { }
-            if (!BattleLuckPlugin.IsInitialized) return;
-        }
-
         try
         {
-            var now = DateTime.UtcNow;
-            float delta = (float)(now - _lastTick).TotalSeconds;
-            _lastTick = now;
+            // Retry initialization at a controlled interval, not every frame.
+            if (!BattleLuckPlugin.IsInitialized)
+            {
+                var nowSec = Stopwatch.Elapsed.TotalSeconds;
+                if (nowSec >= _nextInitRetryAtSeconds)
+                {
+                    try
+                    {
+                        Core.InitializeAfterLoaded();
+                    }
+                    catch (Exception initEx)
+                    {
+                        BattleLuckPlugin.LogWarning($"[BattleLuck] Init attempt failed (will retry in {InitRetryIntervalSeconds:F0}s): {initEx.ToString()}");
+                    }
 
-            // Clamp to avoid huge deltas on first tick or lag spikes
-            if (delta > 2f) delta = 0.016f;
+                    if (!BattleLuckPlugin.IsInitialized)
+                    {
+                        _nextInitRetryAtSeconds = nowSec + InitRetryIntervalSeconds;
+                        return;
+                    }
 
+                    // Initialization succeeded — reset timing baseline so the
+                    // first real tick does not report a multi-second delta.
+                    _lastTickSeconds = Stopwatch.Elapsed.TotalSeconds;
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            var elapsedSeconds = Stopwatch.Elapsed.TotalSeconds;
+            var rawDelta = elapsedSeconds - _lastTickSeconds;
+            _lastTickSeconds = elapsedSeconds;
+
+            // Clamp to avoid huge deltas on first tick or lag spikes,
+            // but preserve meaningful pauses up to the cap.
+            float delta = (float)Math.Min(rawDelta, MaxDeltaSeconds);
+            if (delta < 0f) delta = 0f;
+
+            var nowUtc = DateTime.UtcNow;
+
+            // Process runtime first, then publish tick telemetry so the event
+            // describes a tick that BattleLuck actually processed.
             BattleLuckPlugin.ServerTick(delta);
+
+            ProjectMEventRouter.Instance?.RaiseBattleLuckServerTick(
+                new BattleLuckServerTickEvent(delta, nowUtc));
         }
         catch (Exception ex)
         {
-            BattleLuckPlugin.LogWarning($"[BattleLuck] Tick error: {ex.Message}");
+            BattleLuckPlugin.LogWarning($"[BattleLuck] Tick error: {ex.ToString()}");
         }
     }
 }
