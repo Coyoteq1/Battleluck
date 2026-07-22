@@ -9,6 +9,7 @@ using Xunit;
 
 namespace BattleLuck.Tests.Services;
 
+[Collection("Snapshot persistence")]
 public class PlayerStateControllerTests : IDisposable
 {
     private readonly string _snapshotDir;
@@ -30,7 +31,7 @@ public class PlayerStateControllerTests : IDisposable
         }
     }
 
-    [Fact(Skip = "Requires Unity runtime; skipped in unit environment")]
+    [Fact]
     public void Test_SnapshotFileNaming_And_Fallback_Logic()
     {
         var controller = new PlayerStateController();
@@ -92,7 +93,7 @@ public class PlayerStateControllerTests : IDisposable
         File.Exists(regularPath).Should().BeFalse();
     }
 
-    [Fact(Skip = "Requires Unity runtime; skipped in unit environment")]
+    [Fact]
     public void Test_OldStyleSnapshot_Fallback()
     {
         var controller = new PlayerStateController();
