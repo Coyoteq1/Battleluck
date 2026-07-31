@@ -1,6 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
-
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <LangVersion>latest</LangVersion>
@@ -9,104 +7,133 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
-    
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <!-- BepInEx doesn't use the shared framework; force NuGet deps to copy-local -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+
+    <!-- Assembly identity -->
+    <AssemblyVersion>1.0.0</AssemblyVersion>
+    <FileVersion>1.0.0</FileVersion>
+    <Description>BattleLuck - structured game-mode plugin for V Rising dedicated servers.</Description>
+    <Authors>BattleLuck Contributors</Authors>
+
     <!-- Disable packaging and publishing -->
     <IsPackable>false</IsPackable>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
     <PublishRepositoryUrl>false</PublishRepositoryUrl>
     <IncludeSymbols>false</IncludeSymbols>
     <IncludeSource>false</IncludeSource>
-    <NuGetRoot Condition="'$(NuGetPackageRoot)' != ''">$(NuGetPackageRoot)</NuGetRoot>
-    <NuGetRoot Condition="'$(NuGetRoot)' == '' and '$(USERPROFILE)' != ''">$(USERPROFILE)\.nuget\packages\</NuGetRoot>
-    <VRisingServerRoot Condition="'$(VRisingServerRoot)' == '' and '$(VRISING_SERVER_ROOT)' != ''">$(VRISING_SERVER_ROOT)</VRisingServerRoot>
-    <VRisingServerRoot Condition="'$(VRisingServerRoot)' == ''">C:\Users\aa\OneDrive\Desktop\DedicatedServerLauncher\VRisingServer</VRisingServerRoot>
-    <VRisingServerRoot Condition="'$(VRisingServerRoot)' == '' and '$(USERPROFILE)' != ''">$(USERPROFILE)\VRisingServer</VRisingServerRoot>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="VRising.VampireCommandFramework" />
-    <PackageReference Include="VAutomationCore" />
+
+    <!-- Optional integration library. Resolved at compile time only (Private=false)
+         so its DLL is not bundled into the Thunderstore package; server owners who
+         want the VAutomationCore integration install it separately. -->
+    <PackageReference Include="VAutomationCore" PrivateAssets="all">
+      <IncludeAssets>compile</IncludeAssets>
+      <Private>false</Private>
+    </PackageReference>
 
     <PackageReference Include="VampireReferenceAssemblies" />
     <PackageReference Include="Il2CppInterop.Runtime" />
     <PackageReference Include="HookDOTS.API" />
-    <PackageReference Include="System.Text.Json" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="BepInEx.Core">
-      <HintPath>$(CorePath)\BepInEx.Core.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="BepInEx.Unity.IL2CPP">
-      <HintPath>$(CorePath)\BepInEx.Unity.IL2CPP.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="0Harmony">
-      <HintPath>$(CorePath)\0Harmony.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-    <Reference Include="Iced">
-      <HintPath>$(CorePath)\Iced.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-  </ItemGroup>
-
-  <PropertyGroup>
-    <InteropPath Condition="'$(InteropPath)' == ''">$(VRisingServerRoot)\BepInEx\interop</InteropPath>
-    <CorePath Condition="'$(CorePath)' == ''">$(VRisingServerRoot)\BepInEx\core</CorePath>
-    <UnityLibsPath Condition="'$(UnityLibsPath)' == ''">$(VRisingServerRoot)\BepInEx\unity-libs</UnityLibsPath>
-    <ServerPluginPath Condition="'$(ServerPluginPath)' == ''">$(VRisingServerRoot)\BepInEx\plugins</ServerPluginPath>
-    <ServerConfigPath Condition="'$(ServerConfigPath)' == ''">$(VRisingServerRoot)\BepInEx\config\BattleLuck</ServerConfigPath>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <Reference Include="Stunlock.Core">
-      <HintPath>$(InteropPath)\Stunlock.Core.dll</HintPath>
-      <Private>false</Private>
-    </Reference>
-  </ItemGroup>
-
-  <ItemGroup>
-    <UnityLibDlls Include="$(UnityLibsPath)\*.dll" />
-    <Reference Include="@(UnityLibDlls->'%(Filename)')">
-      <HintPath>%(UnityLibDlls.Identity)</HintPath>
-      <Private>false</Private>
-    </Reference>
+    <PackageReference Include="BouncyCastle.Cryptography" />
+    <PackageReference Include="BepInEx.Unity.IL2CPP" />
+    <PackageReference Include="BepInEx.Unity.Common" />
+    <PackageReference Include="BepInEx.Core" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="config\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="docs\reference\kindredextract-reference.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ServerConfigFiles Include="config\BattleLuck\**\*" />
+    <!-- The live ProjectM/Unity system registry validates registrations against this inventory. -->
+    <ServerReferenceFiles Include="docs\reference\kindredextract-reference.json" />
+  </ItemGroup>
+
+  <!-- Exclude Unity-specific, test, generated, and external folders from SDK globs. -->
+  <ItemGroup>
+    <Compile Remove="Assets\**" />
+    <Compile Remove=".external\**" />
+    <Compile Remove="BattleLuck.Tests\**" />
+    <Compile Remove="Tests\**" />
+    <Compile Remove="scripts\**" />
+    <Compile Remove="8net\**" />
+    <Compile Remove="ai_orchestrator\**" />
+    <Compile Remove="ai_runtime\**" />
+    <Compile Remove="gg\**" />
+    <Compile Remove="google-services\**" />
+    <Compile Remove="kubernetes-engine-samples\**" />
+    <Compile Remove="kubernetes-engine-samples.worktrees\**" />
+    <Compile Remove="lib\**" />
+    <Compile Remove="mcp-servers\**" />
+    <Compile Remove="my-first-site\**" />
+    <Compile Remove="NGG\**" />
+    <Compile Remove="temp_edgegap_repo\**" />
+    <Compile Remove="GenerateREADME.cs" />
+    <Compile Remove="**\*-aa.cs" />
+    <EmbeddedResource Remove="Assets\**" />
+    <EmbeddedResource Remove=".external\**" />
+    <EmbeddedResource Remove="gg\**" />
+    <EmbeddedResource Remove="google-services\**" />
+    <EmbeddedResource Remove="kubernetes-engine-samples\**" />
+    <EmbeddedResource Remove="kubernetes-engine-samples.worktrees\**" />
+    <EmbeddedResource Remove="mcp-servers\**" />
+    <EmbeddedResource Remove="my-first-site\**" />
+    <EmbeddedResource Remove="NGG\**" />
+    <None Remove=".external\**" />
+    <None Remove="gg\**" />
+    <None Remove="google-services\**" />
+    <None Remove="kubernetes-engine-samples\**" />
+    <None Remove="kubernetes-engine-samples.worktrees\**" />
+    <None Remove="mcp-servers\**" />
+    <None Remove="my-first-site\**" />
+    <None Remove="NGG\**" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="config\BattleLuck\**\*.json" />
+    <EmbeddedResource Include="config\BattleLuck\**\*.md" />
+    <EmbeddedResource Include="config\BattleLuck\**\*.txt" />
+    <!-- KindredExtract allowlists are embedded so production servers can
+         validate system/component references without a repository checkout. -->
+    <EmbeddedResource Include="docs\audit\systems\allowlists\*.json" />
     <ServerConfigFiles Include="config\BattleLuck\**\*" />
   </ItemGroup>
 
-  <Target Name="BuildToServer" AfterTargets="Build">
-    <MakeDir Directories="$(ServerConfigPath);@(ServerConfigFiles->'$(ServerConfigPath)\%(RecursiveDir)')" />
-    <Copy
-      SourceFiles="@(ServerConfigFiles)"
-      DestinationFiles="@(ServerConfigFiles->'$(ServerConfigPath)\%(RecursiveDir)%(Filename)%(Extension)')"
-      SkipUnchangedFiles="true" />
-    <Copy
-      SourceFiles="$(TargetDir)$(ProjectName).dll"
-      DestinationFolder="$(ServerPluginPath)"
-      Retries="0"
-      ContinueOnError="WarnAndContinue" />
-  </Target>
+  <ItemGroup>
+    <None Remove="docs\audit\audit-record.schema.json" />
+    <Resource Include="docs\audit\audit-record.schema.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+  </ItemGroup>
 
+  <PropertyGroup>
+    <ServerPluginPath Condition="'$(ServerPluginPath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\VRising\VRising_Server\BepInEx\plugins\BattleLuck</ServerPluginPath>
+    <ServerConfigPath Condition="'$(ServerConfigPath)' == ''">C:\Program Files (x86)\Steam\steamapps\common\VRising\VRising_Server\BepInEx\config\BattleLuck</ServerConfigPath>
+  </PropertyGroup>
 
-  <!-- Auto-regenerate README.md after every local build. Skipped in CI. -->
-  <Target Name="GenerateReadme" AfterTargets="Build"
-          Condition="'$(GITHUB_ACTIONS)' != 'true'">
-    <Exec Command="dotnet run --project &quot;$(MSBuildProjectDirectory)\GenerateREADME.csproj&quot; -- &quot;$(MSBuildProjectDirectory)\Commands&quot; &quot;$(MSBuildProjectDirectory)\README.md&quot;"
-          ContinueOnError="WarnAndContinue"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
+  <Target Name="BuildToServer" AfterTargets="Build" Condition="'$(DeployBattleLuck)' == 'true'">
+    <ItemGroup>
+      <PluginFiles Include="$(TargetDir)$(ProjectName).dll" />
+      <PluginFiles Include="$(TargetDir)BouncyCastle.Cryptography.dll" />
+      <PluginFiles Include="$(TargetDir)HookDOTS.API.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(ServerPluginPath)" />
+    <MakeDir Directories="$(ServerConfigPath)" />
+    <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(ServerPluginPath)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ServerConfigFiles)" DestinationFiles="@(ServerConfigFiles->'$(ServerConfigPath)\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(ServerReferenceFiles)" DestinationFolder="$(ServerConfigPath)" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="[Deploy] Plugin and configs deployed to $(ServerPluginPath) and $(ServerConfigPath)" />
   </Target>
 
 </Project>
-

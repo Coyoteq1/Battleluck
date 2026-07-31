@@ -2,17 +2,26 @@ using Stunlock.Core;
 
 /// <summary>
 /// Versioned snapshot contract — captures full entity state per player.
-/// 13 categories: position, health, energy, blood, equipment levels, equipment slots,
-/// inventory, weapons, abilities, jewels, passives, buffs, progression.
+/// 13-category storage contract: position, health, energy, blood, equipment levels,
+/// equipment slots, inventory, weapons, abilities, jewels, passives, buffs, and
+/// progression. RestoreSnapshot currently replays the native-supported categories
+/// and retains energy/jewel/progression fields for forward-compatible snapshots.
 /// </summary>
 public sealed class PlayerSnapshot
 {
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 2;
     public string GameVersion { get; set; } = "";
     public string PlayerId { get; set; } = "";
     public string Name { get; set; } = "";
     public DateTime Timestamp { get; set; }
     public int ZoneHash { get; set; }
+    /// <summary>Managed event session id that owns this snapshot, when captured at event entry.</summary>
+    public string EventRunId { get; set; } = "";
+    /// <summary>Mode id associated with EventRunId; empty for non-event snapshots.</summary>
+    public string EventModeId { get; set; } = "";
+
+    /// <summary>Native team value captured before an event temporarily reassigns the player.</summary>
+    public int TeamValue { get; set; }
 
     public Vec3Snapshot Position { get; set; } = new();
     public HealthSnapshot Health { get; set; } = new();
@@ -74,6 +83,7 @@ public sealed class EquipmentSlotSnapshot
 
 public sealed class EquipmentSlotsSnapshot
 {
+    public EquipmentSlotSnapshot? Weapon { get; set; }
     public EquipmentSlotSnapshot? Chest { get; set; }
     public EquipmentSlotSnapshot? Legs { get; set; }
     public EquipmentSlotSnapshot? Boots { get; set; }
@@ -118,16 +128,23 @@ public sealed class StatModSnapshot
 
 public sealed class AbilitiesSnapshot
 {
+    public AbilitySlotSnapshot? Primary { get; set; }
+    public AbilitySlotSnapshot? Veil { get; set; }
     public AbilitySlotSnapshot? Travel { get; set; }
+    public AbilitySlotSnapshot? Counter { get; set; }
     public AbilitySlotSnapshot? Spell1 { get; set; }
     public AbilitySlotSnapshot? Spell2 { get; set; }
     public AbilitySlotSnapshot? Ultimate { get; set; }
+    public List<AbilitySlotSnapshot> Slots { get; set; } = new();
 }
 
 public sealed class AbilitySlotSnapshot
 {
+    public int Slot { get; set; }
     public string Prefab { get; set; } = "";
     public int Guid { get; set; }
+    public bool CopyCooldown { get; set; } = true;
+    public int Priority { get; set; }
 }
 
 public sealed class JewelSnapshot

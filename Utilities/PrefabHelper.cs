@@ -1,10 +1,17 @@
 using System.Collections;
 using System.Reflection;
+using System.IO;
+using System.Text.Json;
 using Stunlock.Core;
+using Unity.Entities;
+using Unity.Mathematics;
+using Unity.Transforms;
+using BattleLuck.Models;
 
 /// <summary>
 /// Reflection-based prefab name → PrefabGUID resolver with 3-tier fallback:
 /// exact match → case-insensitive → single partial match → FAIL HARD.
+/// Also provides unified helper methods for prefab-related operations.
 /// </summary>
 public static class PrefabHelper
 {
@@ -125,6 +132,9 @@ public static class PrefabHelper
     {
         if (_liveScanned) return;
 
+        // Eagerly load from the archive first (Data/render-prefabs.json)
+        LoadArchiveNames(Path.Combine("Data", "render-prefabs.json"));
+
         try
         {
             var pcs = VRisingCore.PrefabCollectionSystem;
@@ -199,6 +209,43 @@ public static class PrefabHelper
     }
 
     /// <summary>
+    /// Loads name mappings from the external prefab archive to enrich the live registry.
+    /// </summary>
+    public static void LoadArchiveNames(string jsonPath)
+    {
+        try
+        {
+            if (!File.Exists(jsonPath)) return;
+            var json = File.ReadAllText(jsonPath);
+            var archive = JsonSerializer.Deserialize<PrefabArchive>(json);
+            if (archive == null) return;
+
+            int added = 0;
+            foreach (var kvp in archive.Prefabs)
+            {
+                if (int.TryParse(kvp.Key, out int hash))
+                {
+                    var guid = new PrefabGUID(hash);
+                    var name = kvp.Value.Name;
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        if (_liveCache.TryAdd(name, guid))
+                        {
+                            _liveNameCache.TryAdd(guid, name);
+                            added++;
+                        }
+                    }
+                }
+            }
+            BattleLuckPlugin.LogInfo($"[PrefabHelper] Loaded {added} names from archive.");
+        }
+        catch (Exception ex)
+        {
+            BattleLuckPlugin.LogWarning($"[PrefabHelper] Failed to load archive names: {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// Resolve a prefab name from live PrefabCollectionSystem.
     /// Falls back to partial matching. Requires ScanLivePrefabs() first.
     /// </summary>
@@ -233,7 +280,7 @@ public static class PrefabHelper
     /// <summary>
     /// Combined lookup that only returns GUIDs present in the live prefab map.
     /// Prefers Prefabs.cs constants when still valid, then live exact/partial matches,
-    /// then legacy ArenaBuilds-style fallback heuristics.
+    /// then deprecated ArenaBuilds-style fallback heuristics.
     /// </summary>
     public static PrefabGUID? GetPrefabGuidDeep(string name)
         => GetValidPrefabGuidDeep(name);
@@ -550,5 +597,85 @@ public static class PrefabHelper
         return normalized.Contains("prefab", StringComparison.Ordinal)
             && normalized.Contains("guid", StringComparison.Ordinal)
             && normalized.Contains("name", StringComparison.Ordinal);
+    }
+
+    // ── Unified Prefab Helper Methods ─────────────────────────────────────
+
+    /// <summary>
+    /// Get the yaw rotation in degrees from an entity's Rotation component.
+    /// Consolidated from SchematicLoader and EventBlueprintService.
+    /// </summary>
+    public static float GetYawDegrees(Entity entity)
+    {
+        try
+        {
+            var em = VRisingCore.EntityManager;
+            if (!em.HasComponent<Rotation>(entity))
+                return 0f;
+            var rotation = em.GetComponentData<Rotation>(entity).Value;
+            var forward = math.mul(rotation, new float3(0f, 0f, 1f));
+            return math.degrees(math.atan2(forward.x, forward.z));
+        }
+        catch
+        {
+            return 0f;
+        }
+    }
+
+    /// <summary>
+    /// Read the amount from an ItemPickup component using reflection.
+    /// Consolidated from SchematicLoader and EventBlueprintService.
+    /// </summary>
+    public static int ReadItemPickupAmount(Entity entity)
+    {
+        try
+        {
+            var em = VRisingCore.EntityManager;
+            if (!em.HasComponent<ItemPickup>(entity))
+                return 1;
+
+            var pickup = em.GetComponentData<ItemPickup>(entity);
+            var type = pickup.GetType();
+            foreach (var name in new[] { "Amount", "Stack", "StackSize", "Quantity", "ItemAmount" })
+            {
+                var field = type.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (field == null) continue;
+                var value = field.GetValue(pickup);
+                if (value is int i && i > 0) return i;
+                if (value is uint u && u > 0) return (int)Math.Min(int.MaxValue, u);
+                if (value is short s && s > 0) return s;
+                if (value is ushort us && us > 0) return us;
+            }
+        }
+        catch { }
+
+        return 1;
+    }
+
+    /// <summary>
+    /// Classify a structure prefab name into a structural kind (wall, floor, gate, door, ramp, tile, object).
+    /// Consolidated from SchematicLoader and EventBlueprintService.
+    /// </summary>
+    public static string ClassifyStructure(string prefabName, Entity entity)
+    {
+        var em = VRisingCore.EntityManager;
+        if (prefabName.Contains("Wall", StringComparison.OrdinalIgnoreCase)) return "wall";
+        if (prefabName.Contains("Floor", StringComparison.OrdinalIgnoreCase)) return "floor";
+        if (prefabName.Contains("Gate", StringComparison.OrdinalIgnoreCase)) return "gate";
+        if (prefabName.Contains("Door", StringComparison.OrdinalIgnoreCase)) return "door";
+        if (prefabName.Contains("Stair", StringComparison.OrdinalIgnoreCase) || prefabName.Contains("Ramp", StringComparison.OrdinalIgnoreCase)) return "ramp";
+        if (em.HasComponent<TilePosition>(entity)) return "tile";
+        return "object";
+    }
+
+    /// <summary>
+    /// Check if a point is within XZ radius squared of a center point.
+    /// Consolidated from SchematicLoader and EventBlueprintService.
+    /// </summary>
+    public static bool WithinXZ(float3 point, float3 center, float radiusSq)
+    {
+        var dx = point.x - center.x;
+        var dz = point.z - center.z;
+        return dx * dx + dz * dz <= radiusSq;
     }
 }

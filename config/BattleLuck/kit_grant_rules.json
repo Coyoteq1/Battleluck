@@ -1,13 +1,8 @@
 {
-  "enabled": false,
   "rules": [
     {
-      "itemPrefab": "Item_Weapon_Sword_T09",
-      "kitId": "bloodbath"
-    },
-    {
-      "itemGuid": -1510225645,
-      "kitId": "colosseum"
+      "itemPrefabGuid": -1,
+      "kitId": ""
     }
   ]
 }

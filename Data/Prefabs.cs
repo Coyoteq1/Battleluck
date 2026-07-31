@@ -1,4 +1,6 @@
 using Stunlock.Core;
+using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>
 /// Central prefab registry — single source of truth for ALL PrefabGUID constants.
@@ -6,6 +8,50 @@ using Stunlock.Core;
 /// </summary>
 public static class Prefabs
 {
+    // ── VBlood Units ─────────────────────────────────────────────────────
+    public static readonly PrefabGUID CHAR_Vampire_HighLord_VBlood = new(844833532);
+    public static readonly PrefabGUID CHAR_Manticore_VBlood = new(1689402333);
+    public static readonly PrefabGUID CHAR_Blackfang_Morgana_VBlood = new(562098749);
+    public static readonly PrefabGUID CHAR_Undead_BishopOfShadows_VBlood = new(1739255381);
+    public static readonly PrefabGUID CHAR_Winter_Yeti_VBlood = new(1404813455);
+    public static readonly PrefabGUID CHAR_Forest_Wolf_VBlood = new(1446249180);
+    public static readonly PrefabGUID CHAR_Forest_Bear_VBlood = new(1446249179);
+    public static readonly PrefabGUID CHAR_Forest_Gloomrot_VBlood = new(1446249181);
+    public static readonly PrefabGUID CHAR_Cursed_Forest_VBlood = new(1446249182);
+
+    // ── Research Items ────────────────────────────────────────────────────
+    // ⚠ PLACEHOLDER GUIDs — must be resolved at runtime via ResolveLiveResearchGuids().
+    //   These negative placeholder values (-123456789 family) collide and are NOT valid
+    //   V Rising prefab GUIDs. Resolve from live data on plugin init.
+    public static PrefabGUID Item_Research_Scroll_Tier1 = new(-123456789);
+    public static PrefabGUID Item_Research_Scroll_Tier2 = new(-123456788);
+    public static PrefabGUID Item_Research_Scroll_Tier3 = new(-123456787);
+
+    public static List<PrefabGUID> GetAllVBloodPrefabs()
+    {
+        return new List<PrefabGUID>
+        {
+            CHAR_Vampire_HighLord_VBlood,
+            CHAR_Manticore_VBlood,
+            CHAR_Blackfang_Morgana_VBlood,
+            CHAR_Undead_BishopOfShadows_VBlood,
+            CHAR_Winter_Yeti_VBlood,
+            CHAR_Forest_Wolf_VBlood,
+            CHAR_Forest_Bear_VBlood,
+            CHAR_Forest_Gloomrot_VBlood,
+            CHAR_Cursed_Forest_VBlood
+        };
+    }
+
+    public static List<PrefabGUID> GetAllResearchPrefabs()
+    {
+        return new List<PrefabGUID>
+        {
+            Item_Research_Scroll_Tier1,
+            Item_Research_Scroll_Tier2,
+            Item_Research_Scroll_Tier3
+        };
+    }
     // ── Weapons T09 (Legacy — highest tier) ─────────────────────────────
     public static readonly PrefabGUID Item_Weapon_Sword_T09 = new(-1399352573);
     public static readonly PrefabGUID Item_Weapon_Axe_T09 = new(-1279634570);
@@ -179,16 +225,16 @@ public static class Prefabs
     public static readonly PrefabGUID Item_MagicSource_Storm_T06 = new(1015918370);
 
     // ── Blood Types ─────────────────────────────────────────────────────
-    public static readonly PrefabGUID BloodType_Scholar = new(-700632469);
-    public static readonly PrefabGUID BloodType_Warrior = new(-1094467405);
-    public static readonly PrefabGUID BloodType_Rogue = new(793735874);
-    public static readonly PrefabGUID BloodType_Brute = new(842225604);
-    public static readonly PrefabGUID BloodType_Worker = new(-1389286985);
-    public static readonly PrefabGUID BloodType_Creature = new(1897056612);
-    public static readonly PrefabGUID BloodType_Draculin = new(-1820256602);
-    public static readonly PrefabGUID BloodType_Mutant = new(291861887);
-    public static readonly PrefabGUID BloodType_Frailed = new(899469404);
-    public static readonly PrefabGUID BloodType_VBlood = new(1558171501);
+    public static readonly PrefabGUID BloodType_Scholar = KindredBloodTypes.ToPrefabGuid(KindredBloodType.Scholar);
+    public static readonly PrefabGUID BloodType_Warrior = KindredBloodTypes.ToPrefabGuid(KindredBloodType.Warrior);
+    public static readonly PrefabGUID BloodType_Rogue = KindredBloodTypes.ToPrefabGuid(KindredBloodType.Rogue);
+    public static readonly PrefabGUID BloodType_Brute = KindredBloodTypes.ToPrefabGuid(KindredBloodType.Brute);
+    public static readonly PrefabGUID BloodType_Worker = KindredBloodTypes.ToPrefabGuid(KindredBloodType.Worker);
+    public static readonly PrefabGUID BloodType_Creature = KindredBloodTypes.ToPrefabGuid(KindredBloodType.Creature);
+    public static readonly PrefabGUID BloodType_Draculin = KindredBloodTypes.ToPrefabGuid(KindredBloodType.Draculin);
+    public static readonly PrefabGUID BloodType_Mutant = KindredBloodTypes.ToPrefabGuid(KindredBloodType.Mutant);
+    public static readonly PrefabGUID BloodType_Frailed = KindredBloodTypes.ToPrefabGuid(KindredBloodType.Frailed);
+    public static readonly PrefabGUID BloodType_VBlood = KindredBloodTypes.ToPrefabGuid(KindredBloodType.VBlood);
 
     // ── Blood Abilities ─────────────────────────────────────────────────
     public static readonly PrefabGUID AB_Blood_BloodFountain = new(2067760264);
@@ -273,7 +319,7 @@ public static class Prefabs
     public static readonly PrefabGUID CHAR_Church_Captain = new(1090737596);
     public static readonly PrefabGUID CHAR_Bear_Dire = new(-1391546585);
     public static readonly PrefabGUID CHAR_Werewolf = new(1885959949);
-    public static readonly PrefabGUID CHAR_Golem_Stone = new(543834575);
+    public static readonly PrefabGUID CHAR_Golem_Stone = CHAR_Church_Captain; // Legacy golem GUID is absent in current server builds.
 
     // ── Wildlife Enemies ────────────────────────────────────────────────
     public static readonly PrefabGUID CHAR_Wildlife_Wolf = new(587052543);
@@ -304,7 +350,7 @@ public static class Prefabs
     public static readonly PrefabGUID VBlood_Clive = new(1896428638);       // Clive the Firestarter
     public static readonly PrefabGUID VBlood_Lidia = new(763273073);        // Lidia the Chaos Archer
     public static readonly PrefabGUID VBlood_Rufus = new(2122229952);       // Rufus the Foreman
-    public static readonly PrefabGUID VBlood_Alpha_Wolf = new(-1905691330); // Alpha Wolf
+    public static PrefabGUID VBlood_Alpha_Wolf = new(-1905691330); // Alpha Wolf (resolved at runtime via ResolveLiveBossGuids())
     public static readonly PrefabGUID VBlood_Beatrice = new(-1208888966);   // Beatrice the Tailor
 
     // ── VBlood Bosses — Tier 2 (Dunley Farmlands) ───────────────────────
@@ -312,7 +358,7 @@ public static class Prefabs
     public static readonly PrefabGUID VBlood_Vincent = new(-106490747);     // Vincent the Frostbringer
     public static readonly PrefabGUID VBlood_Christina = new(1491494991);   // Christina the Sun Priestess
     public static readonly PrefabGUID VBlood_Tristan = new(-1449631170);    // Tristan the Vampire Hunter
-    public static readonly PrefabGUID VBlood_Leandra = new(763273073);      // Leandra the Shadow Priestess
+    public static PrefabGUID VBlood_Leandra = new(763273073); // Leandra the Shadow Priestess (resolved at runtime via ResolveLiveBossGuids())
     public static readonly PrefabGUID VBlood_Meredith = new(850622034);     // Meredith the Bright Archer
 
     // ── VBlood Bosses — Tier 3 (Silverlight Hills / Cursed Forest) ──────
@@ -344,11 +390,12 @@ public static class Prefabs
     public static readonly PrefabGUID Buff_General_Condemned = new(476366531);
 
     // ── Object / NPC Buffs ───────────────────────────────────────────────
-    public static readonly PrefabGUID Admin_Invulnerable_Buff = new(532440764);
+    public static PrefabGUID Admin_Invulnerable_Buff = new(532440764);
     public static readonly PrefabGUID Buff_InCombat_PvPVampire = new(697095869);
     public static readonly PrefabGUID Buff_General_Garlic_Area = new(722928856);
     public static readonly PrefabGUID Buff_General_Silver_Sickness = new(-1204150716);
     public static readonly PrefabGUID Buff_General_Holy_T01 = new(-1694644790);
+    public static readonly PrefabGUID Buff_SunDamageDebuff = new(-1315531444);
     public static readonly PrefabGUID Buff_General_PvPProtected = new(-1052685298);
     public static readonly PrefabGUID Buff_General_Phasing = new(1688015088);
     public static readonly PrefabGUID Buff_CombatStance = new(731266764);
@@ -361,7 +408,7 @@ public static class Prefabs
     public static readonly PrefabGUID Buff_Vampire_BearForm = new(2144782508);
     public static readonly PrefabGUID Buff_Vampire_BroadwingForm = new(1205505492);
     public static readonly PrefabGUID Buff_Vampire_Shapeshift_Human = new(1106149733);
-    public static readonly PrefabGUID Buff_Vampire_Exposed = new(697095869);
+    public static readonly PrefabGUID Buff_Vampire_Exposed = new(697095869); // resolved at runtime via ResolveLiveBuffGuids()
 
     // ── Consumables (loot crate rewards) ────────────────────────────────
     public static readonly PrefabGUID Item_Consumable_BloodRoseBrewV01 = new(429052660);
@@ -382,7 +429,7 @@ public static class Prefabs
     public static readonly PrefabGUID Item_Ingredient_BloodCrystal_Minor = new(178196126);
 
     // ── Vampire Base Ability Groups (resolved at runtime, GUIDs for reference) ──
-    public static readonly PrefabGUID AB_Vampire_PrimaryAttack_AbilityGroup = new(-740796338);
+    public static PrefabGUID AB_Vampire_PrimaryAttack_AbilityGroup = new(-740796338); // resolved at runtime via ResolveLiveBossGuids()
     public static readonly PrefabGUID AB_Vampire_VampireDash_AbilityGroup = new(-2089458811);
     public static readonly PrefabGUID AB_Vampire_VeilOfBlood_AbilityGroup = new(-1055144663);
 
@@ -419,6 +466,195 @@ public static class Prefabs
                 Buff_General_Ignite = PrefabGUID.Empty;
             }
         }
+
+        if (Admin_Invulnerable_Buff != PrefabGUID.Empty && !PrefabHelper.ValidatePrefab(Admin_Invulnerable_Buff))
+        {
+            var adminInvulnerable = PrefabHelper.GetLivePrefabGuid("Admin_Invulnerable_Buff")
+                                   ?? PrefabHelper.GetLivePrefabGuid("Buff_Admin_Invulnerable")
+                                   ?? PrefabHelper.GetLivePrefabGuid("Buff_General_Invulnerable");
+
+            if (adminInvulnerable.HasValue && PrefabHelper.ValidatePrefab(adminInvulnerable.Value))
+            {
+                Admin_Invulnerable_Buff = adminInvulnerable.Value;
+                BattleLuckPlugin.LogInfo($"[Prefabs] Resolved Admin_Invulnerable_Buff from live data: {adminInvulnerable.Value.GuidHash}");
+            }
+            else
+            {
+                BattleLuckPlugin.LogWarning($"[Prefabs] Admin_Invulnerable_Buff (532440764) is invalid in this server build. Static event objects will use nondismantle/cleanup protection without that buff.");
+                Admin_Invulnerable_Buff = PrefabGUID.Empty;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Attempt to resolve VBlood boss GUIDs that are suspected duplicates or reference values
+    /// from live data. Targets: VBlood_Alpha_Wolf, VBlood_Leandra, AB_Vampire_PrimaryAttack_AbilityGroup.
+    /// Call after PrefabHelper.ScanLivePrefabs().
+    /// </summary>
+    public static void ResolveLiveBossGuids()
+    {
+        // VBlood_Alpha_Wolf: suspect duplicate of VBlood_Putrid. Try several name variants.
+        var alphaWolf = PrefabHelper.GetLivePrefabGuid("VBlood_Alpha_Wolf")
+                     ?? PrefabHelper.GetLivePrefabGuid("CHAR_Winter_Wolf")
+                     ?? PrefabHelper.GetLivePrefabGuid("CHAR_Wildlife_Wolf_VBlood");
+        if (alphaWolf.HasValue && alphaWolf.Value.GuidHash != VBlood_Putrid.GuidHash)
+        {
+            VBlood_Alpha_Wolf = alphaWolf.Value;
+            BattleLuckPlugin.LogInfo($"[Prefabs] Resolved VBlood_Alpha_Wolf from live data: {alphaWolf.Value.GuidHash} (was: {(-1905691330)})");
+        }
+        else if (VBlood_Alpha_Wolf == VBlood_Putrid)
+        {
+            BattleLuckPlugin.LogWarning($"[Prefabs] VBlood_Alpha_Wolf shares GUID with VBlood_Putrid; treating as alias. Will spawn Putrid when Alpha Wolf is requested.");
+        }
+
+        // VBlood_Leandra: suspect duplicate of VBlood_Lidia. Try several name variants.
+        var leandra = PrefabHelper.GetLivePrefabGuid("VBlood_Leandra")
+                   ?? PrefabHelper.GetLivePrefabGuid("CHAR_Leandra_VBlood")
+                   ?? PrefabHelper.GetLivePrefabGuid("CHAR_Undead_Leandra_VBlood");
+        if (leandra.HasValue && leandra.Value.GuidHash != VBlood_Lidia.GuidHash)
+        {
+            VBlood_Leandra = leandra.Value;
+            BattleLuckPlugin.LogInfo($"[Prefabs] Resolved VBlood_Leandra from live data: {leandra.Value.GuidHash} (was: {(763273073)})");
+        }
+        else if (VBlood_Leandra == VBlood_Lidia)
+        {
+            BattleLuckPlugin.LogWarning($"[Prefabs] VBlood_Leandra shares GUID with VBlood_Lidia; treating as alias. Will spawn Lidia when Leandra is requested.");
+        }
+
+        // AB_Vampire_PrimaryAttack_AbilityGroup: identical to VBlood_SolarusTheImmaculate (likely wrong reference).
+        var primaryAttack = PrefabHelper.GetLivePrefabGuid("AB_Vampire_PrimaryAttack_AbilityGroup")
+                         ?? PrefabHelper.GetLivePrefabGuid("AB_Vampire_BasicAttack_AbilityGroup")
+                         ?? PrefabHelper.GetLivePrefabGuid("VampireBasicAttack");
+        if (primaryAttack.HasValue && primaryAttack.Value.GuidHash != VBlood_SolarusTheImmaculate.GuidHash)
+        {
+            AB_Vampire_PrimaryAttack_AbilityGroup = primaryAttack.Value;
+            BattleLuckPlugin.LogInfo($"[Prefabs] Resolved AB_Vampire_PrimaryAttack_AbilityGroup from live data: {primaryAttack.Value.GuidHash} (was: {(-740796338)})");
+        }
+        else if (AB_Vampire_PrimaryAttack_AbilityGroup == VBlood_SolarusTheImmaculate)
+        {
+            BattleLuckPlugin.LogWarning($"[Prefabs] AB_Vampire_PrimaryAttack_AbilityGroup shares GUID with VBlood_SolarusTheImmaculate; treating as alias. Primary attack ability grants will use the Solarus GUID until a corrected one is found.");
+        }
+    }
+
+    /// <summary>
+    /// Attempt to resolve research scroll GUIDs from live data. The hardcoded -123456789-family
+    /// placeholders are NOT valid V Rising prefab GUIDs. Call after PrefabHelper.ScanLivePrefabs().
+    /// </summary>
+    public static void ResolveLiveResearchGuids()
+    {
+        // Tier 1 scroll — try common naming variants.
+        var t1 = PrefabHelper.GetLivePrefabGuid("Item_Research_Scroll_Tier01")
+              ?? PrefabHelper.GetLivePrefabGuid("Research_Scroll_T1")
+              ?? PrefabHelper.GetLivePrefabGuid("Item_Research_Scroll_T01");
+        if (t1.HasValue)
+        {
+            Item_Research_Scroll_Tier1 = t1.Value;
+            BattleLuckPlugin.LogInfo($"[Prefabs] Resolved Item_Research_Scroll_Tier1 from live data: {t1.Value.GuidHash}");
+        }
+        else if (!PrefabHelper.ValidatePrefab(Item_Research_Scroll_Tier1))
+        {
+            BattleLuckPlugin.LogWarning($"[Prefabs] Item_Research_Scroll_Tier1 ({Item_Research_Scroll_Tier1.GuidHash}) is the placeholder value and was not found in live data. Research unlock effects will be no-ops.");
+            Item_Research_Scroll_Tier1 = PrefabGUID.Empty;
+        }
+
+        // Tier 2 scroll.
+        var t2 = PrefabHelper.GetLivePrefabGuid("Item_Research_Scroll_Tier02")
+              ?? PrefabHelper.GetLivePrefabGuid("Research_Scroll_T2")
+              ?? PrefabHelper.GetLivePrefabGuid("Item_Research_Scroll_T02");
+        if (t2.HasValue)
+        {
+            Item_Research_Scroll_Tier2 = t2.Value;
+            BattleLuckPlugin.LogInfo($"[Prefabs] Resolved Item_Research_Scroll_Tier2 from live data: {t2.Value.GuidHash}");
+        }
+        else if (!PrefabHelper.ValidatePrefab(Item_Research_Scroll_Tier2))
+        {
+            BattleLuckPlugin.LogWarning($"[Prefabs] Item_Research_Scroll_Tier2 ({Item_Research_Scroll_Tier2.GuidHash}) is the placeholder value and was not found in live data.");
+            Item_Research_Scroll_Tier2 = PrefabGUID.Empty;
+        }
+
+        // Tier 3 scroll.
+        var t3 = PrefabHelper.GetLivePrefabGuid("Item_Research_Scroll_Tier03")
+              ?? PrefabHelper.GetLivePrefabGuid("Research_Scroll_T3")
+              ?? PrefabHelper.GetLivePrefabGuid("Item_Research_Scroll_T03");
+        if (t3.HasValue)
+        {
+            Item_Research_Scroll_Tier3 = t3.Value;
+            BattleLuckPlugin.LogInfo($"[Prefabs] Resolved Item_Research_Scroll_Tier3 from live data: {t3.Value.GuidHash}");
+        }
+        else if (!PrefabHelper.ValidatePrefab(Item_Research_Scroll_Tier3))
+        {
+            BattleLuckPlugin.LogWarning($"[Prefabs] Item_Research_Scroll_Tier3 ({Item_Research_Scroll_Tier3.GuidHash}) is the placeholder value and was not found in live data.");
+            Item_Research_Scroll_Tier3 = PrefabGUID.Empty;
+        }
+    }
+
+    /// <summary>
+    /// One-shot entry point: resolves every place where the hardcoded GUID set is incomplete or
+    /// known to collide. Safe to call multiple times.
+    /// </summary>
+    public static void ResolveAllLiveGuids()
+    {
+        ResolveLiveBuffGuids();
+        ResolveLiveBossGuids();
+        ResolveLiveResearchGuids();
+    }
+
+    /// <summary>
+    /// Returns a de-duplicated list of all VBlood boss prefabs. Useful when callers need to
+    /// enumerate bosses for unlocks / kit grants without double-counting the alias entries
+    /// (VBlood_Alpha_Wolf = VBlood_Putrid, VBlood_Leandra = VBlood_Lidia).
+    /// </summary>
+    public static List<PrefabGUID> GetAllVBloodPrefabsUnique()
+    {
+        var raw = new List<PrefabGUID>
+        {
+            CHAR_Vampire_HighLord_VBlood,
+            CHAR_Manticore_VBlood,
+            CHAR_Blackfang_Morgana_VBlood,
+            CHAR_Undead_BishopOfShadows_VBlood,
+            CHAR_Winter_Yeti_VBlood,
+            CHAR_Forest_Wolf_VBlood,
+            CHAR_Forest_Bear_VBlood,
+            CHAR_Forest_Gloomrot_VBlood,
+            CHAR_Cursed_Forest_VBlood,
+            VBlood_Errol,
+            VBlood_Grayson,
+            VBlood_Putrid,
+            VBlood_Keely,
+            VBlood_Nicholaus,
+            VBlood_Quincey,
+            VBlood_Clive,
+            VBlood_Lidia,
+            VBlood_Rufus,
+            VBlood_Alpha_Wolf,
+            VBlood_Beatrice,
+            VBlood_Jade,
+            VBlood_Vincent,
+            VBlood_Christina,
+            VBlood_Tristan,
+            VBlood_Leandra,
+            VBlood_Meredith,
+            VBlood_Octavian,
+            VBlood_Styx,
+            VBlood_Foulrot,
+            VBlood_Gorecrusher,
+            VBlood_Ungora,
+            VBlood_Nightmarshal,
+            VBlood_Dracula,
+            VBlood_SolarusTheImmaculate,
+            VBlood_TheWinged_Horror,
+            VBlood_Morian,
+        };
+
+        // De-dup by GuidHash while preserving order.
+        var seen = new HashSet<int>();
+        var unique = new List<PrefabGUID>(raw.Count);
+        foreach (var guid in raw)
+        {
+            if (guid == PrefabGUID.Empty) continue;
+            if (seen.Add(guid.GuidHash)) unique.Add(guid);
+        }
+        return unique;
     }
 
     // ── Floor Tiles ──────────────────────────────────────────────────────
@@ -480,4 +716,157 @@ public static class Prefabs
             ("illusion",_) => Item_MagicSource_Illusion_T09,
             _ => Item_MagicSource_Blood_T09,
         };
+
+    // ── Per-weapon-type tier helpers (T01–T09) ───────────────────────────
+
+    /// <summary>Returns the axe prefab for a given tier (1–9).</summary>
+    public static PrefabGUID GetAxeForTier(int tier) => tier switch
+    {
+        1 => Item_Weapon_Axe_T01, 2 => Item_Weapon_Axe_T02, 3 => Item_Weapon_Axe_T03,
+        4 => Item_Weapon_Axe_T04, 5 => Item_Weapon_Axe_T05, 6 => Item_Weapon_Axe_T06,
+        7 => Item_Weapon_Axe_T07, 8 => Item_Weapon_Axe_T08, _ => Item_Weapon_Axe_T09,
+    };
+
+    /// <summary>Returns the mace prefab for a given tier (1–9).</summary>
+    public static PrefabGUID GetMaceForTier(int tier) => tier switch
+    {
+        1 => Item_Weapon_Mace_T01, 2 => Item_Weapon_Mace_T02, 3 => Item_Weapon_Mace_T03,
+        4 => Item_Weapon_Mace_T04, 5 => Item_Weapon_Mace_T05, 6 => Item_Weapon_Mace_T06,
+        7 => Item_Weapon_Mace_T07, 8 => Item_Weapon_Mace_T08, _ => Item_Weapon_Mace_T09,
+    };
+
+    /// <summary>Returns the spear prefab for a given tier (1–9).</summary>
+    public static PrefabGUID GetSpearForTier(int tier) => tier switch
+    {
+        1 => Item_Weapon_Spear_T01, 2 => Item_Weapon_Spear_T02, 3 => Item_Weapon_Spear_T03,
+        4 => Item_Weapon_Spear_T04, 5 => Item_Weapon_Spear_T05, 6 => Item_Weapon_Spear_T06,
+        7 => Item_Weapon_Spear_T07, 8 => Item_Weapon_Spear_T08, _ => Item_Weapon_Spear_T09,
+    };
+
+    /// <summary>Returns the crossbow prefab for a given tier (1–9).</summary>
+    public static PrefabGUID GetCrossbowForTier(int tier) => tier switch
+    {
+        1 => Item_Weapon_Crossbow_T01, 2 => Item_Weapon_Crossbow_T02, 3 => Item_Weapon_Crossbow_T03,
+        4 => Item_Weapon_Crossbow_T04, 5 => Item_Weapon_Crossbow_T05, 6 => Item_Weapon_Crossbow_T06,
+        7 => Item_Weapon_Crossbow_T07, 8 => Item_Weapon_Crossbow_T08, _ => Item_Weapon_Crossbow_T09,
+    };
+
+    /// <summary>Returns the slashers prefab for a given tier (1–9).</summary>
+    public static PrefabGUID GetSlashersForTier(int tier) => tier switch
+    {
+        1 => Item_Weapon_Slashers_T01, 2 => Item_Weapon_Slashers_T02, 3 => Item_Weapon_Slashers_T03,
+        4 => Item_Weapon_Slashers_T04, 5 => Item_Weapon_Slashers_T05, 6 => Item_Weapon_Slashers_T06,
+        7 => Item_Weapon_Slashers_T07, 8 => Item_Weapon_Slashers_T08, _ => Item_Weapon_Slashers_T09,
+    };
+
+    /// <summary>Returns the reaper prefab for a given tier (1–9).</summary>
+    public static PrefabGUID GetReaperForTier(int tier) => tier switch
+    {
+        1 => Item_Weapon_Reaper_T01, 2 => Item_Weapon_Reaper_T02, 3 => Item_Weapon_Reaper_T03,
+        4 => Item_Weapon_Reaper_T04, 5 => Item_Weapon_Reaper_T05, 6 => Item_Weapon_Reaper_T06,
+        7 => Item_Weapon_Reaper_T07, 8 => Item_Weapon_Reaper_T08, _ => Item_Weapon_Reaper_T09,
+    };
+
+    /// <summary>Returns the pistols prefab for a given tier (1–9).</summary>
+    public static PrefabGUID GetPistolsForTier(int tier) => tier switch
+    {
+        1 => Item_Weapon_Pistols_T01, 2 => Item_Weapon_Pistols_T02, 3 => Item_Weapon_Pistols_T03,
+        4 => Item_Weapon_Pistols_T04, 5 => Item_Weapon_Pistols_T05, 6 => Item_Weapon_Pistols_T06,
+        7 => Item_Weapon_Pistols_T07, 8 => Item_Weapon_Pistols_T08, _ => Item_Weapon_Pistols_T09,
+    };
+
+    /// <summary>Returns the great sword prefab for a given tier (1–9).</summary>
+    public static PrefabGUID GetGreatSwordForTier(int tier) => tier switch
+    {
+        1 => Item_Weapon_GreatSword_T01, 2 => Item_Weapon_GreatSword_T02, 3 => Item_Weapon_GreatSword_T03,
+        4 => Item_Weapon_GreatSword_T04, 5 => Item_Weapon_GreatSword_T05, 6 => Item_Weapon_GreatSword_T06,
+        7 => Item_Weapon_GreatSword_T07, 8 => Item_Weapon_GreatSword_T08, _ => Item_Weapon_GreatSword_T09,
+    };
+
+    /// <summary>Returns the whip prefab for a given tier (1–9).</summary>
+    public static PrefabGUID GetWhipForTier(int tier) => tier switch
+    {
+        1 => Item_Weapon_Whip_T01, 2 => Item_Weapon_Whip_T02, 3 => Item_Weapon_Whip_T03,
+        4 => Item_Weapon_Whip_T04, 5 => Item_Weapon_Whip_T05, 6 => Item_Weapon_Whip_T06,
+        7 => Item_Weapon_Whip_T07, 8 => Item_Weapon_Whip_T08, _ => Item_Weapon_Whip_T09,
+    };
+
+    /// <summary>
+    /// Returns any weapon prefab by type name and tier (1–9).
+    /// Recognised types: sword, axe, mace, spear, crossbow, slashers, reaper, pistols, greatsword, whip.
+    /// Falls back to sword for unknown type strings.
+    /// </summary>
+    public static PrefabGUID GetWeaponForTypeAndTier(string weaponType, int tier) =>
+        weaponType.ToLowerInvariant() switch
+        {
+            "axe"        => GetAxeForTier(tier),
+            "mace"       => GetMaceForTier(tier),
+            "spear"      => GetSpearForTier(tier),
+            "crossbow"   => GetCrossbowForTier(tier),
+            "slashers"   => GetSlashersForTier(tier),
+            "reaper"     => GetReaperForTier(tier),
+            "pistols"    => GetPistolsForTier(tier),
+            "greatsword" => GetGreatSwordForTier(tier),
+            "whip"       => GetWhipForTier(tier),
+            _            => GetSwordForTier(tier),
+        };
+
+    // ── Per-slot armor tier helpers (available tiers: 2/4/6/8/9) ────────
+
+    /// <summary>Returns the legs armor prefab for a given tier (2/4/6/8/9).</summary>
+    public static PrefabGUID GetLegsForTier(int tier) => tier switch
+    {
+        2 => Item_Armor_Legs_T02, 4 => Item_Armor_Legs_T04,
+        6 => Item_Armor_Legs_T06, 8 => Item_Armor_Legs_T08,
+        _ => Item_Armor_Legs_T09,
+    };
+
+    /// <summary>Returns the gloves armor prefab for a given tier (2/4/6/8/9).</summary>
+    public static PrefabGUID GetGlovesForTier(int tier) => tier switch
+    {
+        2 => Item_Armor_Gloves_T02, 4 => Item_Armor_Gloves_T04,
+        6 => Item_Armor_Gloves_T06, 8 => Item_Armor_Gloves_T08,
+        _ => Item_Armor_Gloves_T09,
+    };
+
+    /// <summary>Returns the boots armor prefab for a given tier (2/4/6/8/9).</summary>
+    public static PrefabGUID GetBootsForTier(int tier) => tier switch
+    {
+        2 => Item_Armor_Boots_T02, 4 => Item_Armor_Boots_T04,
+        6 => Item_Armor_Boots_T06, 8 => Item_Armor_Boots_T08,
+        _ => Item_Armor_Boots_T09,
+    };
+
+    /// <summary>Returns the cloak prefab for a given tier (2/4/6/8/9).</summary>
+    public static PrefabGUID GetCloakForTier(int tier) => tier switch
+    {
+        2 => Item_Cloak_T02, 4 => Item_Cloak_T04,
+        6 => Item_Cloak_T06, 8 => Item_Cloak_T08,
+        _ => Item_Cloak_T09,
+    };
+
+    /// <summary>Returns the headgear prefab for a given tier (2/4/6/8/9).</summary>
+    public static PrefabGUID GetHeadgearForTier(int tier) => tier switch
+    {
+        2 => Item_Headgear_T02, 4 => Item_Headgear_T04,
+        6 => Item_Headgear_T06, 8 => Item_Headgear_T08,
+        _ => Item_Headgear_T09,
+    };
+
+    /// <summary>
+    /// Returns a complete armor set (all 6 slots) for a given tier (2/4/6/8/9).
+    /// </summary>
+    public static (PrefabGUID Chest, PrefabGUID Legs, PrefabGUID Gloves, PrefabGUID Boots, PrefabGUID Cloak, PrefabGUID Headgear)
+        GetFullArmorSetForTier(int tier) => (
+            GetChestForTier(tier),
+            GetLegsForTier(tier),
+            GetGlovesForTier(tier),
+            GetBootsForTier(tier),
+            GetCloakForTier(tier),
+            GetHeadgearForTier(tier)
+        );
+
+    // ── AI Hologram Display ─────────────────────────────────────────────────────
+    public static readonly PrefabGUID AI_Hologram_Entity = PrefabGUID.Empty; // Reserved for future use
+    public static readonly PrefabGUID Obj_TextMarker = PrefabGUID.Empty; // Resolved at runtime if available
 }

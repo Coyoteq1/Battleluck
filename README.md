@@ -1,310 +1,80 @@
 # BattleLuck
 
-BattleLuck is a V Rising BepInEx plugin focused on competitive arena-style modes, player state snapshots, zone-driven match flow, optional AI assistance, Discord/webhook integrations, and server-side event control. all thrue configs u can change actions while u r in the game , some actions are working with ai like .ai servant send regionname some not 
+BattleLuck is a server-side BepInEx IL2CPP plugin for V Rising dedicated servers. It provides configurable competitive and cooperative game events, managed player sessions, rollback-safe player state, NPC and boss control, progression, death-prevention, teleports, schematics, and an ECS-backed action pipeline.
 
+Optional local AI assists with event authoring, catalog search, and admin guidance. Players receive advice and self-service actions; authenticated admins may describe catalog actions in natural language. Every live mutation is previewed, explicitly confirmed, revalidated, and executed on the server main thread.
 
-## 📚 Documentation
+## Install
 
-**For comprehensive documentation, see [docs/README.md](docs/README.md)**
+1. Install BepInEx and [VampireCommandFramework](https://thunderstore.io/c/v-rising/p/deca/VampireCommandFramework/) on the dedicated server.
+2. Copy the package into `BepInEx/` or use a Thunderstore mod manager.
+3. Start the server. The DLL extracts default config files to `BepInEx/config/BattleLuck/`.
+4. Edit event definitions in `BepInEx/config/BattleLuck/events/<eventId>/`.
+5. Use `.help` in game to see commands for your permission level.
 
-Covers: Installation, Configuration, Commands, APIs, Troubleshooting, and more.
+Extraction is additive — the DLL never overwrites existing config, so upgrades preserve server-owner changes.
 
-**Additional Resources**:
-- [System Architecture](docs/ARCHITECTURE.md) - Detailed system design
-- [Audit Report](docs/AUDIT_REPORT.md) - Documentation audit summary
-- [V Rising Modding](docs/vrisingmods/) - V Rising ECS reference
+## AI
 
-## 🚀 CI/CD
+AI is server-owned and local-first. No model weights or credentials are bundled in the mod.
 
-BattleLuck uses GitHub Actions for automated building and releasing.
+- The server reads `ai_config.json` and starts the configured provider or local fallback.
+- Use `.ai <question or action description>`; the word `request` is not required.
+- Admin descriptions resolve to canonical catalog actions. Live mutations return a preview and require `.ai yes` or `.ai confirm <token>`.
+- Example: `.ai spawn a boss at a random position` resolves an allowlisted boss and event-owned position, then waits for confirmation.
+- Use `.aistatus` to check provider health; `.ai.reload` to refresh config.
+- Hosted AI, Discord, and webhook integrations are opt-in.
 
-### Build & Release
+See [LLM Guide](docs/LLM_GUIDE.md) for provider setup and the prompt contract.
 
-Automatically builds the mod on every push to `main`/`master` and creates GitHub releases with semantic versioning.
+## Features
 
-**Triggers**: Push to main/master, manual dispatch
+- Action-driven event runtime with configurable modes (Bloodbath, Colosseum, custom events).
+- NPC control, boss commands, and safe action reachability checks.
+- Player event sessions, loadouts, progression, death-prevention charges, and native-backed rollback snapshots.
+- Teleport services, schematics, zone detection, and verified data catalogs.
+- Optional local LLM for event authoring with approval gates and main-thread-safe execution.
+- Server-only action contract: every registered action is server-side, works with unmodified clients, and uses native replication.
 
-### Thunderstore Release
+### Event and mode terminology
 
-Publishes releases to Thunderstore when a GitHub release is published.
+`modeId` and `eventId` refer to the same configuration concept (e.g. `bloodbath`, `colosseum`). The name `modeId` is retained for backward compatibility.
 
-**Setup Required**:
-1. Add `THUNDERSTORE_KEY` secret to your repository settings
-2. Create releases through GitHub UI or manually via workflow dispatch
-
-**Getting Thunderstore API Key**:
-1. Go to [Thunderstore](https://thunderstore.io/)
-2. Sign in and go to Settings → API Keys
-3. Create a new API key
-4. Add it as `THUNDERSTORE_KEY` in your GitHub repository secrets
-
-### Dependency Updates
-
-Automatically checks for NuGet package updates weekly and creates pull requests.
-
-**Triggers**: Weekly (Sundays), manual dispatch
-
-### Semantic Versioning
-
-Version numbers are automatically incremented based on commit messages:
-
-- `+semver:major` or `+semver:breaking` → Major version bump (x.0.0)
-- `+semver:minor` or `+semver:feature` → Minor version bump (0.x.0)
-- `+semver:patch` or `+semver:fix` → Patch version bump (0.0.x)
-
-**Example**: `git commit -m "add new game mode +semver:minor"`
-
-## Modes
-
-| Mode ID | Display Name | Purpose |
-| --- | --- | --- |
-| `bloodbath` | Bloodbath | Free-for-all PvP arena |
-| `colosseum` | Colosseum | Duel/ELO-focused arena |
-| `gauntlet` | Gauntlet | PvE wave survival |
-| `siege` | Siege | Objective/team event mode |
-| `trials` | Trials | Timed PvE challenge |
-| `aievent` | AI Event Test | Deterministic AI-flow test mode |
-
-## Commands
-
-BattleLuck commands are registered through VampireCommandFramework.
-🔒 = admin only.
-
-### Admin Commands
-
-| Command | Description |
-| --- | --- |
-| `.ai.event` 🔒 | Replay AI event flow (start, score, elimination, end) without entering a zone |
-| `.ai.reload` 🔒 | Reload AI configuration and restart service |
-| `.ai.status` 🔒 | Show detailed AI assistant status |
-| `.ai.test` 🔒 | Test AI assistant with a sample query |
-| `.autotrash` 🔒 | Toggle auto-trash for dropped items in mode zones |
-| `.autotrash.status` 🔒 | Show auto-trash stats |
-| `.debugabilities` 🔒 | Print all discovered AbilityGroup prefabs from the server |
-| `.debugslots` 🔒 | Print combat key slot resolution status |
-| `.event.clearburning` 🔒 | Remove burning penalty from all players |
-| `.event.end` 🔒 | End all sessions for a mode and clear burning |
-| `.event.endall` 🔒 | End ALL active sessions and clear all burning |
-| `.event.forceenter` 🔒 | Force a player into a mode |
-| `.event.forceexit` 🔒 | Force a player out of their current event |
-| `.event.start` 🔒 | Start an event mode (teleports you in) |
-| `.event.status` 🔒 | Show all active events and player counts |
-| `.freebuild` 🔒 | Toggle building restrictions off/on |
-| `.kick` 🔒 | Kick player from session |
-| `.pause` 🔒 | Pause all active sessions |
-| `.reload` 🔒 | Reload configs from disk |
-| `.resume` 🔒 | Resume paused sessions |
-| `..scanbufs [filter]` 🔒 | Scan live prefabs for buffs |
-| `..scanitems <filter>` 🔒 | Scan live prefabs for items |
-| `..scanprefabs <filter> [maxResults]` 🔒 | Scan live prefabs matching a filter |
-| `.setwinner` 🔒 | Set winner and end session |
-| `..spawntest <prefabGUID>` 🔒 | Test-spawn a unit at your position |
-| `..spawnwave <tier> <count>` 🔒 | Test-spawn a wave of enemies |
-| `..stashnpc <destNetId> [sourceNetId|allteam] [maxDistance] [sameTeam] [minStack] [maxStacks] [itemFilter]` 🔒 | Transfer items from NPC source(s) to destination entity |
-| `.zoneinfo` 🔒 | Show zone stats and player counts |
-
-### DataExport Commands
-
-| Command | Description |
-| --- | --- |
-| `.discoverkits` 🔒 | Auto-discover the best weapon/armor/tile/ability prefabs from live game data and export kit.json template |
-| `.exportmods` 🔒 | Export all loaded mod data (plugins, prefabs, APIs) to JSON |
-| `.exportplugins` 🔒 | Export loaded BepInEx plugin info to JSON |
-| `.exportprefabs` 🔒 | Export server live prefab collection to JSON |
-| `.findtiles` 🔒 | Search live prefabs for tile/wall/floor building pieces |
-| `.searchprefab` 🔒 | Search ALL live prefabs by name pattern (e.g. 'Item_Weapon_Sword', 'AB_Chaos', 'Item_Armor') |
-| `.validateprefabs` 🔒 | Check if BattleLuck prefab GUIDs exist in the game's entity map |
-
-### Mode Commands
-
-| Command | Description |
-| --- | --- |
-| `.force` 🔒 | Teleport to mode's zone and auto-start session |
-| `.modeend` 🔒 | Force-end all sessions for a mode |
-| `.modeinfo` 🔒 | Show mode configuration details |
-| `.modelist` 🔒 | List all registered game modes |
-| `.modestart` 🔒 | Start a game mode manually |
-
-### Mutator Commands
-
-| Command | Description |
-| --- | --- |
-| `.mutatorclear` 🔒 | Clear all mutators |
-| `.mutatordisable` 🔒 | Disable a mutator |
-| `.mutatorenable` 🔒 | Enable a mutator |
-| `.mutatorlist` | List available mutators |
-
-### Player Commands
-
-| Command | Description |
-| --- | --- |
-| `.actions` | Show valid actions for the current mode |
-| `..ai <your question>` | Chat with the AI assistant |
-| `.aistatus` | Show AI assistant status and settings |
-| `.elo` | Show Elo ratings for Colosseum mode |
-| `.exit` | Force exit current zone session |
-| `.help` | Show available BattleLuck commands |
-| `.kit` 🔒 | Apply full end-game kit to yourself |
-| `.score` | Show current scoreboard |
-| `.toggleenter` | Enter a zone session. Use: .toggleenter [modeName] |
-| `.toggleleave` | Properly leave the current zone session |
-
-### Team Commands
-
-| Command | Description |
-| --- | --- |
-| `.teamaccept` | Accept team invite |
-| `.teamcreate` | Create a team |
-| `.teaminvite` | Invite player to your team |
-| `.teamleave` | Leave your team |
-| `.teamlist` | List all teams |
-
-
-## Configuration Layout
-
-BattleLuck reads config from `config/BattleLuck/`.
-
-### Per-mode folders
-
-Each mode folder contains:
-
-- `session.json`
-- `zones.json`
-- `flow_enter.json`
-- `flow_exit.json`
-- `kit.json`
-
-### Global files
-
-- `ai_config.json`: Google AI + optional sidecar settings
-- `ai_logger.json`: AI/event logging providers and routing
-- `discord_bridge.json`: Discord interaction bridge server config
-- `webhook.json`: BattleLuck webhook listener config
-- `special_item.json`: Special item transformation behavior
-- `kit_grant_rules.json`: Item-to-kit reward rules for craft completion hooks
-
-## AI, Discord, and Webhooks
-
-- The Discord bridge is optional and is disabled by default unless `discord_bridge.json` has `enabled: true`.
-- The AI assistant can run in Gemini-only mode or with sidecar enrichment.
-- The sidecar client expects an API root that exposes `GET /health` and `POST /api/query/enrich`.
-- A Superuser chat page URL is not the same thing as a sidecar API base URL.
-- Stripe-to-Discord relay support lives in the AI sidecar functions and uses `POST /stripe/discord`.
-
-## Snapshot System
-
-BattleLuck snapshots player state before mode entry and restores it on clean exit, rollback, or penalty-death recovery. The runtime currently captures and restores:
-
-- Position
-- Health
-- Blood state
-- Equipment level values
-- Inventory items
-- Derived equipped gear slots
-- Weapon entries
-- Ability slot replacements
-- Passive buff-like abilities
-- Active buffs
-
-Snapshots are persisted under `BepInEx/data/BattleLuck/snapshots/`.
+```text
+ModeId / EventId = bloodbath          # the configuration
+SessionId        = a specific run      # an instance
+ZoneHash         = the zone used       # the location
+```
 
 ## Build
 
-Release build output:
-
-- `bin/Release/net6.0/BattleLuck.dll`
-
-Typical build command:
-
 ```powershell
 dotnet build BattleLuck.sln -c Release
+
+# Deploy to server
+dotnet build BattleLuck.sln -c Release /p:DeployBattleLuck=true `
+  /p:ServerPluginPath="C:\Path\to\BepInEx\plugins\BattleLuck" `
+  /p:ServerConfigPath="C:\Path\to\BepInEx\config\BattleLuck"
 ```
 
-### Optional: Build directly to server install
+## Commands
 
-Set `VRISING_SERVER_ROOT` to your dedicated server path so post-build copy targets resolve cleanly.
+`.help` is the live permission-aware source of truth. The primary interface is `.ai`; all other commands are optional admin tools for events, NPCs, schematics, and integrations.
 
-Example PowerShell session:
+See the [User Guide](docs/user/README.md) for the full categorized command reference.
 
-```powershell
-$env:VRISING_SERVER_ROOT = "C:\\Path\\To\\VRisingServer"
-dotnet build BattleLuck.sln -c Release
-```
+## Documentation
 
-## Thunderstore Packaging
+- [User guide](docs/user/README.md) — commands, configuration, event creation, troubleshooting
+- [Developer guide](docs/developer/README.md) — architecture, ECS patterns, build setup
+- [AI and prompt guide](docs/LLM_GUIDE.md) — provider setup, director loop, security
+- [V Rising Mod Wiki](https://wiki.vrisingmods.com/)
 
-This repository now includes a Thunderstore `manifest.json` template at the root.
+## Support
 
-Before publishing, ensure your package zip contains:
-
-- `BattleLuck.dll`
-- `manifest.json`
-- `README.md`
-- `icon.png` (256x256)
-- `CHANGELOG.md` (recommended)
-
-Follow upload guidance from the V Rising Mod Wiki:
-
-- https://wiki.vrisingmods.com/dev/upload_to_thunderstore.html
-
-## Dependencies and Credits
-
-BattleLuck depends on:
-
-- BepInEx (mod loader)
-- VampireCommandFramework (command registration and parsing)
-
-Please keep dependency attributions and manifest dependency entries aligned with your released build.
+Maintainer: **coyoteq1**
+Discord: <https://discord.gg/uJ2ehWv4gR>
 
 ## License
 
-BattleLuck is licensed under MIT. See `LICENSE`.
-
-Third-party dependency and runtime component notices are documented in `THIRD_PARTY_NOTICES.md`, including `VAutomationCore`, `VampireCommandFramework`, `BepInEx`, `Il2CppInterop`, and other referenced components.
-
-## Notes
-
-- Building restriction bypass is handled by debug-setting toggles in `BuildingRestrictionController`.
-- `PlaceTileModelSystemPatch` only re-blocks castle heart placement while free-build is active.
-- If prefab validation fails, prefer live prefab scanning/export over stale hardcoded GUIDs.
-#
-## Badges  
-[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)  
-[![GPLv3 License](https://img.shields.io/badge/License-GPL%20v3-yellow.svg)](https://choosealicense.com/licenses/gpl-3.0/)  
-[![AGPL License](https://img.shields.io/badge/license-AGPL-blue.svg)](https://choosealicense.com/licenses/gpl-3.0/)  
-
-## Features  
-- Accessibility in VS Code  
-- Download directly to project root  
-- Live Previews    
-
-## License  
-[MIT](https://choosealicense.com/licenses/mit/)  
-
-## Run Locally  
-Clone the project  
-
-~~~bash  
-  git clone https://link-to-project
-~~~
-
-Go to the project directory  
-
-~~~bash  
-  cd my-project
-~~~
-
-Install dependencies  
-
-~~~bash  
-npm install
-~~~
-
-Start the server  
-
-~~~bash  
-npm run start
-~~~  
-
-## Screenshots  
-![App Screenshot](https://lanecdr.org/wp-content/uploads/2019/08/placeholder.png)  
+GNU Affero General Public License v3. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -32,4 +32,8 @@ public sealed class BossDefinition
 
     [JsonPropertyName("glow")]
     public bool Glow { get; set; }
+
+    [JsonPropertyName("level")]
+    public int Level { get; set; }
 }
+

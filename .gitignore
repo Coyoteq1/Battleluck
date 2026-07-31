@@ -1,12 +1,94 @@
-bin/
-obj/
+# Secrets & Credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.env
+*.env.local
+*.env.*.local
+secrets.json
+credentials.json
+appsettings.*.json
+!appsettings.json
+!appsettings.Example.json
+
+# User directories
+.external/
+.agentsroom/
+.claude/
+.idea/
 .vs/
 .vscode/
+
+# Build artifacts
+bin/
+obj/
+obj-readme/
+obj-tests/
+
+# ThunderStore package
+thunderstore_package/
+*.zip
+
+# Large/transient model & build artifacts
+blobs/
+manifests/
+tools/oracleJdk-26/
+
+# External/generated code
+External/genai-stack/
+my-first-site/
+gg/
+NGG/
+
+# Supabase sidecar and private local state
+# Keep the entire unrelated messaging product, migrations, local database,
+# generated bundles, project references, and credentials out of BattleLuck Git.
+messaging-app/
+supabase/
+**/supabase/
+.supabase/
+
+# MCP servers
+mcp-servers/embedder/
+mcp-servers/server-monitor/
+
+# IDE and user files
 *.user
 *.suo
-*.cache
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# Build logs
+msbuild.log
 *.log
-.DS_Store
-Thumbs.db
-*～
-*.tmp
+docker-logs-*.csv
+
+# Environment files
+.env
+.env.*
+.venv/
+venv/
+env/
+node_modules/
+kubernetes-engine-samples/
+kubernetes-engine-samples.worktrees/
+
+# NGG specific
+NGG/.gitignore
+NGG/.python-version
+NGG/.aitk/
+NGG/inspector/
+.mcp.json
+
+# GitHub workflows (moved to .agents/workflows)
+.github/
+
+# Misc transient
+c
+start
+todo.md
+errors.txt
+dist/BattleLuck/BouncyCastle.Cryptography.dll

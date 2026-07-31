@@ -1,0 +1,33 @@
+{
+  "settings": {
+    "healOnApply": true,
+    "clearInventoryFirst": true
+  },
+  "blood": {
+    "type": "Brute",
+    "quality": 100.0,
+    "value": 100.0
+  },
+  "armors": {
+    "chest": "Item_Chest_T08_DarkSilver",
+    "legs": "Item_Legs_T08_DarkSilver",
+    "gloves": "Item_Gloves_T08_DarkSilver",
+    "boots": "Item_Boots_T08_DarkSilver",
+    "magicSource": "Item_MagicSource_General_T08_Chaos"
+  },
+  "weapons": [
+    { "prefab": "Item_Weapon_Sword_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Axe_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Mace_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Spear_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Crossbow_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Slashers_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Reaper_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Pistols_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_GreatSword_T08_Sanguine", "amount": 1 },
+    { "prefab": "Item_Weapon_Whip_T08_Sanguine", "amount": 1 }
+  ],
+  "items": [],
+  "abilities": {},
+  "passiveSpells": []
+}

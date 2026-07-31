@@ -1,4 +1,5 @@
 using ProjectM;
+using BattleLuck.Core;
 
 namespace BattleLuck.Models;
 
@@ -19,6 +20,8 @@ public enum ActionType
     BossKill,
     EliteKill,
     Elimination,
+    BloodFrenzyActivated,
+    BloodFrenzyKill,
 
     // ── Colosseum ────────────────────────────────────────────────────
     DuelWin,
@@ -39,106 +42,212 @@ public enum ActionType
     TrialKill,
     ObjectiveComplete,
     TimeBonus,
-    SpeedBonus
+    SpeedBonus,
+
+    // ── New Actions (Phase 2) ────────────────────────────────────────
+    DoorOpen,
+    DoorClose,
+    DoorLock,
+    DoorUnlock,
+    BossFollow,
+    BossClearFollow,
+    TrapPlaced,
+    TrapTriggered,
+    MountSummoned,
+    MountDismissed,
+    MountSlowed,
+    ZoneBuffApplied,
+    ZoneBuffRemoved,
+    PlayerBuffApplied,
+    PlayerBuffRemoved,
+    WallBuilt,
+    WallDestroyed,
+    FloorPlaced,
+    SequencePlayed,
+    SequenceStopped,
+    GlowEnabled,
+    GlowDisabled,
+    AutoTeleportTriggered,
+    AutoFlyTriggered,
+    ReviveLifeUsed,
+    ReviveLifeGranted,
+    ObjectiveCaptured,
+    ObjectiveCompleted,
+    ShrinkZoneStarted,
+    ShrinkZoneStopped,
+    PlayerDowngraded,
+    PlayerUpgraded,
+    EquipRestricted,
+    EquipUnrestricted,
+    AutotrashCleared,
+    AutotrashSet,
+    AIBossAggroSet,
+    AIBossDeaggroSet,
+    AISetBehaviorSet,
+    AISpawnGroupSpawned,
+    EntityDamaged,
+    EntityHealed,
+    TimerStarted,
+    TimerStopped,
+    ScoreAdded,
+    ScoreResetDone,
+    NotificationSent,
+    ConditionChecked,
+    SpatialPointSet,
+    SpatialEffectSpawned,
+    FactionSetDone,
+    FactionCleared,
+    DeathPrevented,
+    DeathAllowed
 }
 
 /// <summary>
-/// Curated SequenceGUID constants from V Rising for BattleLuck event VFX.
+/// Extension methods for ActionType enum.
+/// </summary>
+public static class ActionTypeExtensions
+{
+    public static string ToConfigString(this ActionType type) => type.ToString();
+
+    public static ActionType FromConfigString(string value) =>
+        Enum.TryParse<ActionType>(value, out var result) ? result : ActionType.Kill;
+}
+
+/// <summary>
+/// Reference fallback SequenceGUID constants for BattleLuck event VFX.
+/// They are not target-build verification. Confirm hashes in-game and promote
+/// only the confirmed values to config/BattleLuck/sequences/uuid_catalog.json.
+/// Loaded from config/action_config.json when present.
 /// </summary>
 public static class ActionSequences
 {
+    private static Dictionary<string, Dictionary<string, int>>? _sequences;
+    private static Dictionary<string, string>? _actionVFXMapping;
+    private static Dictionary<string, SequenceGUID>? _sequenceCache;
+
+    static ActionSequences()
+    {
+        LoadFromConfig();
+    }
+
+    public static void LoadFromConfig()
+    {
+        try
+        {
+            var config = ConfigLoader.LoadActionConfig();
+            _sequences = config.Sequences;
+            _actionVFXMapping = config.ActionVFXMapping;
+            _sequenceCache = new();
+
+            if (_sequences != null)
+            {
+                foreach (var category in _sequences)
+                {
+                    foreach (var sequence in category.Value)
+                    {
+                        _sequenceCache[$"{category.Key}.{sequence.Key}"] = new SequenceGUID(sequence.Value);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            BattleLuckPlugin.LogWarning($"[ActionSequences] Failed to load from config: {ex.Message}");
+            _sequences = new();
+            _actionVFXMapping = new();
+            _sequenceCache = new();
+        }
+    }
+
+    public static void Reload()
+    {
+        LoadFromConfig();
+    }
+
     // ── Combat ───────────────────────────────────────────────────────
-    public static readonly SequenceGUID Kill_Impact           = new(-476819435);   // SEQ_Shared_Object_Hit
-    public static readonly SequenceGUID Death_Dissolve        = new(1498540414);   // SEQ_Shared_AdvancedDeath
-    public static readonly SequenceGUID Assist_Glow           = new(893118035);    // SEQ_Shared_Buff
-    public static readonly SequenceGUID Elimination_Burst     = new(-906728229);   // SEQ_Shared_Object_Destroy
+    public static SequenceGUID Kill_Impact => GetSequence("Combat.Kill_Impact", -476819435);
+    public static SequenceGUID Death_Dissolve => GetSequence("Combat.Death_Dissolve", 1498540414);
+    public static SequenceGUID Assist_Glow => GetSequence("Combat.Assist_Glow", 893118035);
+    public static SequenceGUID Elimination_Burst => GetSequence("Combat.Elimination_Burst", -906728229);
 
     // ── Level / Score ────────────────────────────────────────────────
-    public static readonly SequenceGUID LevelUp               = new(-1046001899);  // SEQ_Vampire_LevelUp
-    public static readonly SequenceGUID EloGain_Sparkle       = new(1845986301);   // SEQ_Shared_Buff_1
-    public static readonly SequenceGUID ScoreFlash            = new(785779005);    // SEQ_Shared_Buff_2
+    public static SequenceGUID LevelUp => GetSequence("Level_Score.LevelUp", -1046001899);
+    public static SequenceGUID EloGain_Sparkle => GetSequence("Level_Score.EloGain_Sparkle", 1845986301);
+    public static SequenceGUID ScoreFlash => GetSequence("Level_Score.ScoreFlash", 785779005);
 
     // ── Boss / Elite ─────────────────────────────────────────────────
-    public static readonly SequenceGUID BossKill_Explosion    = new(-1790763425);  // SEQ_Shared_AdvancedDeath_2
-    public static readonly SequenceGUID BossWounded           = new(-868779850);   // SEQ_Shared_Boss_Wounded
-    public static readonly SequenceGUID EliteKill_Shatter     = new(-1654901741);  // SEQ_Shared_AdvancedDeath_3
-    public static readonly SequenceGUID BossSpawn_Aura        = new(1127550179);   // SEQ_Vampire_FeedBoss_Trigger_Complete
+    public static SequenceGUID BossKill_Explosion => GetSequence("Boss_Elite.BossKill_Explosion", -1790763425);
+    public static SequenceGUID BossWounded => GetSequence("Boss_Elite.BossWounded", -868779850);
+    public static SequenceGUID EliteKill_Shatter => GetSequence("Boss_Elite.EliteKill_Shatter", -1654901741);
+    public static SequenceGUID BossSpawn_Aura => GetSequence("Boss_Elite.BossSpawn_Aura", 1127550179);
 
     // ── Loot / Pickup ────────────────────────────────────────────────
-    public static readonly SequenceGUID LootCrate_Open        = new(1268037080);   // SEQ_PickupItem_01_7
-    public static readonly SequenceGUID ItemPickup            = new(-1430997544);   // SEQ_PickupItem_01_15
+    public static SequenceGUID LootCrate_Open => GetSequence("Loot_Pickup.LootCrate_Open", 1268037080);
+    public static SequenceGUID ItemPickup => GetSequence("Loot_Pickup.ItemPickup", -1430997544);
 
     // ── Objectives ───────────────────────────────────────────────────
-    public static readonly SequenceGUID ObjectiveCapture_Flag = new(744374235);    // SEQ_ContestArena_ActiveFlag_Team01
-    public static readonly SequenceGUID ObjectiveDefend_Shield= new(1427675323);   // SEQ_ContestArena_ActiveFlag_Team02
-    public static readonly SequenceGUID ObjectiveComplete_Win = new(922857755);    // SEQ_Contest_Start
-    public static readonly SequenceGUID ContestCountdown      = new(-1142510568);  // SEQ_ContestArenaCountdown
-    public static readonly SequenceGUID ContestBossCountdown  = new(-679471019);   // SEQ_ContestBossCountdown
+    public static SequenceGUID ObjectiveCapture_Flag => GetSequence("Objectives.ObjectiveCapture_Flag", 744374235);
+    public static SequenceGUID ObjectiveDefend_Shield => GetSequence("Objectives.ObjectiveDefend_Shield", 1427675323);
+    public static SequenceGUID ObjectiveComplete_Win => GetSequence("Objectives.ObjectiveComplete_Win", 922857755);
+    public static SequenceGUID ContestCountdown => GetSequence("Objectives.ContestCountdown", -1142510568);
+    public static SequenceGUID ContestBossCountdown => GetSequence("Objectives.ContestBossCountdown", -679471019);
 
     // ── Wave / Gauntlet ──────────────────────────────────────────────
-    public static readonly SequenceGUID WaveKill_Hit          = new(-173616274);   // SEQ_Shared_Object_Hit_1
-    public static readonly SequenceGUID WaveClear_Pulse       = new(2049283058);   // SEQ_Shared_Buff_3
-    public static readonly SequenceGUID WaveSurvive_Shield    = new(-723783303);   // SEQ_Shared_Buff_4
+    public static SequenceGUID WaveKill_Hit => GetSequence("Wave_Gauntlet.WaveKill_Hit", -173616274);
+    public static SequenceGUID WaveClear_Pulse => GetSequence("Wave_Gauntlet.WaveClear_Pulse", 2049283058);
+    public static SequenceGUID WaveSurvive_Shield => GetSequence("Wave_Gauntlet.WaveSurvive_Shield", -723783303);
 
     // ── Duel / Colosseum ─────────────────────────────────────────────
-    public static readonly SequenceGUID DuelWin_Triumph       = new(-192572431);   // SEQ_Contest_Immaterial
-    public static readonly SequenceGUID DuelLoss_Fade         = new(-262774549);   // SEQ_Contest_Rematerialize
-    public static readonly SequenceGUID DuelStart_Flash       = new(1382804845);   // SEQ_Blink_Standard_White_1
+    public static SequenceGUID DuelWin_Triumph => GetSequence("Duel_Colosseum.DuelWin_Triumph", -192572431);
+    public static SequenceGUID DuelLoss_Fade => GetSequence("Duel_Colosseum.DuelLoss_Fade", -262774549);
+    public static SequenceGUID DuelStart_Flash => GetSequence("Duel_Colosseum.DuelStart_Flash", 1382804845);
 
     // ── Siege ────────────────────────────────────────────────────────
-    public static readonly SequenceGUID TeamFlag_01           = new(2136921210);   // SEQ_ArenaFlag_OccupiedSlotActive_Team01
-    public static readonly SequenceGUID TeamFlag_02           = new(617961739);    // SEQ_ArenaFlag_OccupiedSlotActive_Team02
-    public static readonly SequenceGUID TeamFlag_03           = new(-146303596);   // SEQ_ArenaFlag_OccupiedSlotActive_Team03
-    public static readonly SequenceGUID TeamFlag_04           = new(478520190);    // SEQ_ArenaFlag_OccupiedSlotActive_Team04
-    public static readonly SequenceGUID TeamWipe_Shake        = new(-648034606);   // SEQ_Shared_Shake_Feedback_Small_6
+    public static SequenceGUID TeamFlag_01 => GetSequence("Siege.TeamFlag_01", 2136921210);
+    public static SequenceGUID TeamFlag_02 => GetSequence("Siege.TeamFlag_02", 617961739);
+    public static SequenceGUID TeamFlag_03 => GetSequence("Siege.TeamFlag_03", -146303596);
+    public static SequenceGUID TeamFlag_04 => GetSequence("Siege.TeamFlag_04", 478520190);
+    public static SequenceGUID TeamWipe_Shake => GetSequence("Siege.TeamWipe_Shake", -648034606);
 
     // ── Trials / Speed / Time ────────────────────────────────────────
-    public static readonly SequenceGUID TimeBonus_Glow        = new(-217996174);   // SEQ_Shared_Buff_5
-    public static readonly SequenceGUID SpeedBonus_Dash       = new(-207886408);   // SEQ_Shared_Dash_Phase_1
-    public static readonly SequenceGUID TrialKill_Slash       = new(-1765901933);  // SEQ_Fireball_Cast_01
+    public static SequenceGUID TimeBonus_Glow => GetSequence("Trials_Speed_Time.TimeBonus_Glow", -217996174);
+    public static SequenceGUID SpeedBonus_Dash => GetSequence("Trials_Speed_Time.SpeedBonus_Dash", -207886408);
+    public static SequenceGUID TrialKill_Slash => GetSequence("Trials_Speed_Time.TrialKill_Slash", -1765901933);
 
     // ── Environment / Utility ────────────────────────────────────────
-    public static readonly SequenceGUID Teleport_Arrive       = new(-1780773164);  // SEQ_GeneralTeleport_TravelEnd
-    public static readonly SequenceGUID Waypoint_Active       = new(-1096288616);  // SEQ_Waypoint_Active
-    public static readonly SequenceGUID Dawn_Warning          = new(392579464);    // SEQ_Dawn
-    public static readonly SequenceGUID Dusk_Signal           = new(-1603359499);  // SEQ_Dusk
-    public static readonly SequenceGUID Coffin_Respawn        = new(1043723895);   // SEQ_Workstation_Coffin_Respawn
-    public static readonly SequenceGUID ShrinkZone_Effect     = new(-850896030);   // SEQ_Shared_OverTime_Effect
-    public static readonly SequenceGUID Stun_VFX              = new(1972314495);   // SEQ_Shared_Buff_Stun
-    public static readonly SequenceGUID Poison_Debuff         = new(-174380957);   // SEQ_Poison_Debuff
-    public static readonly SequenceGUID BellRing              = new(1968734759);   // SEQ_BellRing
+    public static SequenceGUID Teleport_Arrive => GetSequence("Environment_Utility.Teleport_Arrive", -1780773164);
+    public static SequenceGUID Waypoint_Active => GetSequence("Environment_Utility.Waypoint_Active", -1096288616);
+    public static SequenceGUID Dawn_Warning => GetSequence("Environment_Utility.Dawn_Warning", 392579464);
+    public static SequenceGUID Dusk_Signal => GetSequence("Environment_Utility.Dusk_Signal", -1603359499);
+    public static SequenceGUID Coffin_Respawn => GetSequence("Environment_Utility.Coffin_Respawn", 1043723895);
+    public static SequenceGUID ShrinkZone_Effect => GetSequence("Environment_Utility.ShrinkZone_Effect", -850896030);
+    public static SequenceGUID Stun_VFX => GetSequence("Environment_Utility.Stun_VFX", 1972314495);
+    public static SequenceGUID Poison_Debuff => GetSequence("Environment_Utility.Poison_Debuff", -174380957);
+    public static SequenceGUID BellRing => GetSequence("Environment_Utility.BellRing", 1968734759);
+
+    private static SequenceGUID GetSequence(string key, int fallback)
+    {
+        if (_sequenceCache != null && _sequenceCache.TryGetValue(key, out var seq))
+            return seq;
+        return new SequenceGUID(fallback);
+    }
 
     /// <summary>
-    /// Maps each ActionType to its primary VFX SequenceGUID.
-    /// </summary>
-    public static readonly Dictionary<ActionType, SequenceGUID> ActionVFX = new()
+/// Maps each ActionType to its primary VFX SequenceGUID.
+/// </summary>
+    public static SequenceGUID GetVFX(ActionType type)
     {
-        { ActionType.Kill,             Kill_Impact },
-        { ActionType.Death,            Death_Dissolve },
-        { ActionType.Assist,           Assist_Glow },
-        { ActionType.Survive,          WaveSurvive_Shield },
-        { ActionType.LootCrate,        LootCrate_Open },
-        { ActionType.BossKill,         BossKill_Explosion },
-        { ActionType.EliteKill,        EliteKill_Shatter },
-        { ActionType.Elimination,      Elimination_Burst },
-        { ActionType.DuelWin,          DuelWin_Triumph },
-        { ActionType.DuelLoss,         DuelLoss_Fade },
-        { ActionType.EloGain,          EloGain_Sparkle },
-        { ActionType.WaveKill,         WaveKill_Hit },
-        { ActionType.WaveClear,        WaveClear_Pulse },
-        { ActionType.WaveSurvive,      WaveSurvive_Shield },
-        { ActionType.ObjectiveCapture, ObjectiveCapture_Flag },
-        { ActionType.ObjectiveDefend,  ObjectiveDefend_Shield },
-        { ActionType.TeamWipeRound,    TeamWipe_Shake },
-        { ActionType.TrialKill,        TrialKill_Slash },
-        { ActionType.ObjectiveComplete,ObjectiveComplete_Win },
-        { ActionType.TimeBonus,        TimeBonus_Glow },
-        { ActionType.SpeedBonus,       SpeedBonus_Dash },
-    };
-
-    public static SequenceGUID GetVFX(ActionType type) =>
-        ActionVFX.TryGetValue(type, out var seq) ? seq : Kill_Impact;
-}
+        if (_actionVFXMapping != null && _actionVFXMapping.TryGetValue(type.ToString(), out var sequenceKey))
+        {
+            // Try to find the sequence in the cache
+            foreach (var category in _sequences ?? new())
+            {
+                if (category.Value.TryGetValue(sequenceKey, out var guid))
+                    return new SequenceGUID(guid);
+            }
+        }
+        return Kill_Impact;
+    }
+ }
 
 /// <summary>
 /// Category grouping for display filtering.
@@ -153,56 +262,80 @@ public enum ActionCategory
 
 /// <summary>
 /// Defines display metadata and point values for each action type per mode.
+/// Loaded from config/action_config.json.
 /// </summary>
 public static class ActionRegistry
 {
-    public static readonly Dictionary<ActionType, ActionInfo> Actions = new()
+    private static Dictionary<ActionType, ActionInfo>? _actions;
+    private static Dictionary<string, HashSet<ActionType>>? _modeActions;
+
+    static ActionRegistry()
     {
-        // Universal
-        { ActionType.Kill,             new("Kill",              ActionCategory.Combat,    "<color=#FF4444>Kill</color>",              1) },
-        { ActionType.Death,            new("Death",             ActionCategory.Combat,    "<color=#888888>Death</color>",             0) },
-        { ActionType.Assist,           new("Assist",            ActionCategory.Combat,    "<color=#FFAA00>Assist</color>",            0) },
-        { ActionType.Survive,          new("Survive",           ActionCategory.Survival,  "<color=#44FF44>Survive</color>",           0) },
+        LoadFromConfig();
+    }
 
-        // Bloodbath
-        { ActionType.LootCrate,        new("Loot Crate",        ActionCategory.Objective, "<color=#FFD700>Loot Crate</color>",        5) },
-        { ActionType.BossKill,         new("Boss Kill",         ActionCategory.Combat,    "<color=#FF00FF>Boss Kill</color>",         10) },
-        { ActionType.EliteKill,        new("Elite Kill",        ActionCategory.Combat,    "<color=#FF6600>Elite Kill</color>",        3) },
-        { ActionType.Elimination,      new("Elimination",       ActionCategory.Combat,    "<color=#FF0000>Elimination</color>",       0) },
-
-        // Colosseum
-        { ActionType.DuelWin,          new("Duel Win",          ActionCategory.Combat,    "<color=#00FFFF>Duel Win</color>",          1) },
-        { ActionType.DuelLoss,         new("Duel Loss",         ActionCategory.Combat,    "<color=#666666>Duel Loss</color>",         0) },
-        { ActionType.EloGain,          new("Elo Gain",          ActionCategory.Bonus,     "<color=#00FF88>Elo Gain</color>",          0) },
-
-        // Gauntlet
-        { ActionType.WaveKill,         new("Wave Kill",         ActionCategory.Combat,    "<color=#FF8844>Wave Kill</color>",         10) },
-        { ActionType.WaveClear,        new("Wave Clear",        ActionCategory.Objective, "<color=#44FFFF>Wave Clear</color>",        0) },
-        { ActionType.WaveSurvive,      new("Wave Survive",      ActionCategory.Survival,  "<color=#44FF44>Wave Survive</color>",      0) },
-
-        // Siege
-        { ActionType.ObjectiveCapture, new("Objective Capture", ActionCategory.Objective, "<color=#00CCFF>Objective Capture</color>", 0) },
-        { ActionType.ObjectiveDefend,  new("Objective Defend",  ActionCategory.Objective, "<color=#00AAFF>Objective Defend</color>",  0) },
-        { ActionType.TeamWipeRound,    new("Team Wipe Round",   ActionCategory.Combat,    "<color=#FF2222>Team Wipe</color>",         0) },
-
-        // Trials
-        { ActionType.TrialKill,        new("Trial Kill",        ActionCategory.Combat,    "<color=#FFAA44>Trial Kill</color>",        5) },
-        { ActionType.ObjectiveComplete,new("Objective Complete", ActionCategory.Objective, "<color=#FFD700>Objective Complete</color>",50) },
-        { ActionType.TimeBonus,        new("Time Bonus",        ActionCategory.Bonus,     "<color=#AAFFAA>Time Bonus</color>",        0) },
-        { ActionType.SpeedBonus,       new("Speed Bonus",       ActionCategory.Bonus,     "<color=#AAFFEE>Speed Bonus</color>",       0) },
-    };
-
-    /// <summary>
-    /// Which actions are valid for each game mode.
-    /// </summary>
-    public static readonly Dictionary<string, HashSet<ActionType>> ModeActions = new(StringComparer.OrdinalIgnoreCase)
+    public static void LoadFromConfig()
     {
-        { "bloodbath", new() { ActionType.Kill, ActionType.Death, ActionType.Assist, ActionType.Survive, ActionType.LootCrate, ActionType.BossKill, ActionType.EliteKill, ActionType.Elimination } },
-        { "colosseum", new() { ActionType.Kill, ActionType.Death, ActionType.DuelWin, ActionType.DuelLoss, ActionType.EloGain } },
-        { "gauntlet",  new() { ActionType.Kill, ActionType.Death, ActionType.Survive, ActionType.WaveKill, ActionType.WaveClear, ActionType.WaveSurvive } },
-        { "siege",     new() { ActionType.Kill, ActionType.Death, ActionType.Assist, ActionType.ObjectiveCapture, ActionType.ObjectiveDefend, ActionType.TeamWipeRound } },
-        { "trials",    new() { ActionType.Kill, ActionType.Death, ActionType.Survive, ActionType.TrialKill, ActionType.ObjectiveComplete, ActionType.TimeBonus, ActionType.SpeedBonus } },
-    };
+        try
+        {
+            var config = ConfigLoader.LoadActionConfig();
+            _actions = new();
+            _modeActions = new(StringComparer.OrdinalIgnoreCase);
+
+            // Load action metadata
+            if (config.Actions != null)
+            {
+                foreach (var kvp in config.Actions)
+                {
+                    if (Enum.TryParse<ActionType>(kvp.Key, out var actionType))
+                    {
+                        var info = kvp.Value;
+                        if (Enum.TryParse<ActionCategory>(info.Category, out var category))
+                        {
+                            _actions[actionType] = new ActionInfo(
+                                info.Name,
+                                category,
+                                info.ColoredLabel,
+                                info.DefaultPoints
+                            );
+                        }
+                    }
+                }
+            }
+
+            // Load mode actions
+            if (config.ModeActions != null)
+            {
+                foreach (var kvp in config.ModeActions)
+                {
+                    var actionSet = new HashSet<ActionType>();
+                    foreach (var actionName in kvp.Value)
+                    {
+                        if (Enum.TryParse<ActionType>(actionName, out var actionType))
+                        {
+                            actionSet.Add(actionType);
+                        }
+                    }
+                    _modeActions[kvp.Key] = actionSet;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            BattleLuckPlugin.LogWarning($"[ActionRegistry] Failed to load from config: {ex.Message}");
+            _actions = new();
+            _modeActions = new(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    public static void Reload()
+    {
+        LoadFromConfig();
+    }
+
+    public static Dictionary<ActionType, ActionInfo> Actions => _actions ?? new();
+
+    public static Dictionary<string, HashSet<ActionType>> ModeActions => _modeActions ?? new(StringComparer.OrdinalIgnoreCase);
 
     public static string GetColoredName(ActionType type) =>
         Actions.TryGetValue(type, out var info) ? info.ColoredLabel : type.ToString();

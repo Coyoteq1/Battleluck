@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using BattleLuck.Models;
 
 /// <summary>
 /// Runtime context passed to game mode lifecycle hooks.
@@ -25,6 +26,9 @@ public sealed class GameModeContext
 
     /// <summary>Arbitrary mode-specific state bag.</summary>
     public Dictionary<string, object?> State { get; } = new();
+
+    /// <summary>Active tech state for this event session instance.</summary>
+    public SessionTechState TechState { get; set; } = new();
 
     /// <summary>When the mode started (UTC).</summary>
     public DateTime StartTimeUtc { get; set; } = DateTime.UtcNow;

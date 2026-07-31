@@ -40,4 +40,24 @@ public sealed class GlowBorderConfig
 
     [JsonPropertyName("batchSize")]
     public int BatchSize { get; set; } = 10;
+
+    /// <summary>Spawn fire glow entities on zone border. Prefab name.</summary>
+    [JsonPropertyName("spawnGlowEntities")]
+    public string? SpawnGlowEntities { get; set; }
+
+    /// <summary>Number of glow entities to spawn around border</summary>
+    [JsonPropertyName("glowEntityCount")]
+    public int GlowEntityCount { get; set; } = 20;
+
+    /// <summary>Distance from zone center to spawn glow entities (0 = use zone radius)</summary>
+    [JsonPropertyName("glowRadius")]
+    public float GlowRadius { get; set; } = 0f;
+
+    /// <summary>Disable sun damage inside zone (applies Holy buff)</summary>
+    [JsonPropertyName("disableSunEffects")]
+    public bool DisableSunEffects { get; set; } = false;
+
+    /// <summary>Make player friendly to NPCs (sets faction to friendly team)</summary>
+    [JsonPropertyName("npcFriendly")]
+    public bool NpcFriendly { get; set; } = false;
 }

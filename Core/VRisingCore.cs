@@ -14,6 +14,7 @@ public static class VRisingCore
     static ServerScriptMapper? _serverScriptMapper;
     static DebugEventsSystem? _debugEventsSystem;
     static PrefabCollectionSystem? _prefabCollectionSystem;
+    static AdminAuthSystem? _adminAuthSystem;
     static EntityQuery? _onlinePlayersQuery;
 
     public static bool IsReady => _server != null && _server.IsCreated;
@@ -68,6 +69,18 @@ public static class VRisingCore
     }
 
     /// <summary>
+    /// Server admin auth system used by admin-console style checks.
+    /// </summary>
+    public static AdminAuthSystem AdminAuthSystem
+    {
+        get
+        {
+            _adminAuthSystem ??= GetSystem<AdminAuthSystem>();
+            return _adminAuthSystem;
+        }
+    }
+
+    /// <summary>
     /// Initialize from the V Rising dedicated server world.
     /// Call once during plugin Load after the server world is available.
     /// </summary>
@@ -93,6 +106,7 @@ public static class VRisingCore
         _serverScriptMapper = null;
         _debugEventsSystem = null;
         _prefabCollectionSystem = null;
+        _adminAuthSystem = null;
         _onlinePlayersQuery = null;
     }
 
@@ -112,6 +126,99 @@ public static class VRisingCore
         return null;
     }
 
+    public static Entity GetPrefabEntityByGuid(PrefabGUID guid)
+    {
+        if (PrefabCollectionSystem._PrefabGuidToEntityMap.TryGetValue(guid, out var entity))
+            return entity;
+        return Entity.Null;
+    }
+
+    /// <summary>Count live entities matching a prefab name pattern via PrefabCollectionSystem.</summary>
+    public static int CountEntities(string componentTypeName)
+    {
+        int count = 0;
+        try
+        {
+            var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<PrefabGUID>());
+            try
+            {
+                var entities = query.ToEntityArray(Allocator.Temp);
+                try
+                {
+                    for (int i = 0; i < entities.Length; i++)
+                    {
+                        if (!entities[i].Exists()) continue;
+                        var prefab = entities[i].Read<PrefabGUID>();
+                        var name = PrefabHelper.GetName(prefab) ?? "";
+                        if (name.IndexOf(componentTypeName, StringComparison.OrdinalIgnoreCase) >= 0)
+                            count++;
+                    }
+                }
+                finally
+                {
+                    entities.Dispose();
+                }
+            }
+            finally
+            {
+                query.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            BattleLuckPlugin.LogWarning($"[VRisingCore] CountEntities('{componentTypeName}') failed: {ex.Message}");
+        }
+        return count;
+    }
+
+    /// <summary>Destroy up to <paramref name="max"/> live entities matching a prefab name pattern.</summary>
+    public static int DestroyEntities(string componentTypeName, int? max = null)
+    {
+        int destroyed = 0;
+        int deferred = 0;
+        try
+        {
+            var query = EntityManager.CreateEntityQuery(ComponentType.ReadOnly<PrefabGUID>());
+            try
+            {
+                var entities = query.ToEntityArray(Allocator.Temp);
+                try
+                {
+                    for (int i = 0; i < entities.Length; i++)
+                    {
+                        if (max.HasValue && destroyed >= max.Value) break;
+                        if (!entities[i].Exists()) continue;
+                        var prefab = entities[i].Read<PrefabGUID>();
+                        var name = PrefabHelper.GetName(prefab) ?? "";
+                        if (name.IndexOf(componentTypeName, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        try { entities[i].DestroyWithReason(); destroyed++; }
+                        catch (Exception ex) when (ex.Message.Contains("in live", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Entity is currently being processed by ECS systems - will be cleaned up on next tick
+                            deferred++;
+                        }
+                        catch { }
+                    }
+                }
+                finally
+                {
+                    entities.Dispose();
+                }
+            }
+            finally
+            {
+                query.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            BattleLuckPlugin.LogWarning($"[VRisingCore] DestroyEntities('{componentTypeName}') failed: {ex.Message}");
+        }
+        if (deferred > 0)
+            BattleLuckPlugin.LogInfo($"[VRisingCore] DestroyEntities deferred {deferred} entity(ies) (in live state).");
+        return destroyed;
+    }
+
     /// <summary>
     /// Get all online player character entities.
     /// </summary>
@@ -119,10 +226,27 @@ public static class VRisingCore
     {
         _onlinePlayersQuery ??= EntityManager.CreateEntityQuery(ComponentType.ReadOnly<PlayerCharacter>());
         var entities = _onlinePlayersQuery.Value.ToEntityArray(Allocator.Temp);
-        var players = new List<Entity>(entities.Length);
-        for (int i = 0; i < entities.Length; i++)
-            players.Add(entities[i]);
-        entities.Dispose();
-        return players;
+        try
+        {
+            var players = new List<Entity>(entities.Length);
+            for (int i = 0; i < entities.Length; i++)
+                players.Add(entities[i]);
+            return players;
+        }
+        finally
+        {
+            entities.Dispose();
+        }
+    }
+
+    public static Entity GetPlayerEntityBySteamId(ulong steamId)
+    {
+        var players = GetOnlinePlayers();
+        foreach (var player in players)
+        {
+            if (player.Exists() && player.IsPlayer() && player.GetSteamId() == steamId)
+                return player;
+        }
+        return Entity.Null;
     }
 }

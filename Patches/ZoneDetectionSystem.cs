@@ -9,9 +9,10 @@ using Unity.Mathematics;
 public sealed class ZoneDetectionSystem
 {
     readonly Dictionary<ulong, int> _playerZones = new(); // steamId → zoneHash (0 = not in zone)
+    readonly Dictionary<ulong, float3> _lastOutsidePositions = new();
     readonly Dictionary<int, ZoneDefinition> _allZones = new();
     DateTime _lastCheck = DateTime.UtcNow;
-    int _checkIntervalMs = 500;
+    int _checkIntervalMs = DetectionConfig.CHECK_INTERVAL_DEFAULT;
 
     /// <summary>Raised when a player enters a zone. (steamId, playerEntity, zone)</summary>
     public event Action<ulong, Entity, ZoneDefinition>? OnPlayerEnterZone;
@@ -19,21 +20,32 @@ public sealed class ZoneDetectionSystem
     /// <summary>Raised when a player exits a zone. (steamId, playerEntity, previousZoneHash)</summary>
     public event Action<ulong, Entity, int>? OnPlayerExitZone;
 
-    public void Initialize()
+    public void Initialize(GameModeRegistry registry)
     {
         _allZones.Clear();
-        foreach (var modeId in new[] { "gauntlet", "bloodbath", "siege", "trials", "colosseum" })
+        foreach (var modeId in registry.GetRegisteredModes())
         {
             var config = ConfigLoader.Load(modeId);
             _checkIntervalMs = config.Zones.Detection.CheckIntervalMs;
 
             foreach (var zone in config.Zones.Zones)
-            {
-                _allZones[zone.Hash] = zone;
-            }
+                RegisterZone(zone);
         }
 
         BattleLuckPlugin.LogInfo($"[ZoneDetection] Loaded {_allZones.Count} zones.");
+    }
+
+    /// <summary>
+    /// Add or replace a live zone after an event definition is deployed.
+    /// Session registration, walking detection, and map markers must all use
+    /// the same zone inventory.
+    /// </summary>
+    public void RegisterZone(ZoneDefinition zone)
+    {
+        if (zone == null || zone.Hash == 0)
+            return;
+
+        _allZones[zone.Hash] = zone;
     }
 
     /// <summary>Call from game loop tick. Checks all online players against all zones.</summary>
@@ -52,6 +64,9 @@ public sealed class ZoneDetectionSystem
             float3 pos = player.GetPosition();
             int currentZone = _playerZones.GetValueOrDefault(steamId, 0);
             int detectedZone = DetectZone(pos);
+
+            if (detectedZone == 0)
+                _lastOutsidePositions[steamId] = pos;
 
             if (currentZone != detectedZone)
             {
@@ -92,6 +107,14 @@ public sealed class ZoneDetectionSystem
     /// <summary>Manually set a player's zone (e.g., after teleport).</summary>
     public void SetPlayerZone(ulong steamId, int zoneHash) => _playerZones[steamId] = zoneHash;
 
+    /// <summary>Last position observed while the player was outside every BattleLuck zone.</summary>
+    public float3? GetLastOutsidePosition(ulong steamId) =>
+        _lastOutsidePositions.TryGetValue(steamId, out var position) ? position : null;
+
     /// <summary>Remove player tracking (disconnect).</summary>
-    public void RemovePlayer(ulong steamId) => _playerZones.Remove(steamId);
+    public void RemovePlayer(ulong steamId)
+    {
+        _playerZones.Remove(steamId);
+        _lastOutsidePositions.Remove(steamId);
+    }
 }

@@ -1,6 +1,18 @@
-﻿using ProjectM;
+using ProjectM;
 using Stunlock.Core;
 using Unity.Entities;
+using BattleLuck.Core.Loaders;
+
+/// <summary>
+/// Mode of kit application.
+/// FullLoadout replaces the entire player loadout (inventory, blood, abilities, etc.).
+/// AdditiveReward grants only the configured items without clearing inventory or modifying other state.
+/// </summary>
+public enum KitApplyMode
+{
+    FullLoadout,
+    AdditiveReward
+}
 
 /// <summary>
 /// Applies full kit loadouts from kit.json per mode.
@@ -17,11 +29,16 @@ public static class KitController
         if (_kitCache.TryGetValue(modeId, out var cached))
             return cached;
 
-        var path = Path.Combine(ConfigLoader.ConfigRoot, modeId, "kit.json");
+        var path = Path.Combine(ModeConfigLoader.KitsRoot, modeId, "kits.json");
         if (!File.Exists(path))
         {
-            BattleLuckPlugin.LogWarning($"[KitController] Missing kit.json: {path}");
-            return null;
+            // Fallback for transition or separate kits folder
+            path = Path.Combine(ConfigLoader.ConfigRoot, "kits", $"{modeId}.json");
+            if (!File.Exists(path))
+            {
+                BattleLuckPlugin.LogWarning($"[KitController] Missing kits.json for {modeId} at {path}");
+                return null;
+            }
         }
 
         try
@@ -50,6 +67,124 @@ public static class KitController
     public static void ClearCache() => _kitCache.Clear();
 
     /// <summary>
+    /// Preflight validation result for kit configuration.
+    /// Lists all prefabs that will be granted and any that are missing.
+    /// </summary>
+    public sealed class KitPreflightResult
+    {
+        public bool Success { get; set; }
+        public string? Error { get; set; }
+        public List<string> ValidPrefabs { get; set; } = new();
+        public List<string> MissingPrefabs { get; set; } = new();
+        public List<string> ResolvedViaCompatibility { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Validate all kit prefabs can be resolved before applying.
+    /// Returns a result listing valid and missing prefabs.
+    /// </summary>
+    public static KitPreflightResult ValidateKitPrefabs(string modeId)
+    {
+        var result = new KitPreflightResult();
+        var kit = LoadKit(modeId);
+        if (kit == null)
+        {
+            result.Error = $"Kit not found for mode '{modeId}'";
+            return result;
+        }
+
+        // Validate weapons
+        foreach (var weapon in kit.Weapons)
+        {
+            if (string.IsNullOrWhiteSpace(weapon.Prefab))
+                continue;
+
+            var guid = PrefabHelper.GetValidPrefabGuidDeep(weapon.Prefab);
+            if (guid.HasValue)
+            {
+                result.ValidPrefabs.Add(weapon.Prefab);
+            }
+            else
+            {
+                // Check if we can find a compatible live item
+                var candidates = FindCompatibleLiveItemCandidates(weapon.Prefab, "weapon").ToList();
+                if (candidates.Any())
+                {
+                    result.ResolvedViaCompatibility.Add($"{weapon.Prefab} -> {candidates.First().Name}");
+                }
+                else
+                {
+                    result.MissingPrefabs.Add(weapon.Prefab);
+                }
+            }
+        }
+
+        // Validate armors
+        if (kit.Armors != null)
+        {
+            ValidateArmorSlot(kit.Armors.Chest, "chest", result);
+            ValidateArmorSlot(kit.Armors.Legs, "legs", result);
+            ValidateArmorSlot(kit.Armors.Gloves, "gloves", result);
+            ValidateArmorSlot(kit.Armors.Boots, "boots", result);
+            ValidateArmorSlot(kit.Armors.Cloak, "cloak", result);
+            ValidateArmorSlot(kit.Armors.Headgear, "headgear", result);
+            ValidateArmorSlot(kit.Armors.MagicSource, "magicSource", result);
+            ValidateArmorSlot(kit.Armors.Bag, "bag", result);
+        }
+
+        // Validate items
+        foreach (var item in kit.Items)
+        {
+            if (string.IsNullOrWhiteSpace(item.Prefab))
+                continue;
+
+            var guid = PrefabHelper.GetValidPrefabGuidDeep(item.Prefab);
+            if (guid.HasValue)
+            {
+                result.ValidPrefabs.Add(item.Prefab);
+            }
+            else
+            {
+                result.MissingPrefabs.Add(item.Prefab);
+            }
+        }
+
+        // Validate blood type
+        if (kit.Blood != null)
+        {
+            var bloodGuid = PrefabHelper.GetPrefabGuid($"BloodType_{kit.Blood.Type}");
+            if (!bloodGuid.HasValue)
+            {
+                result.MissingPrefabs.Add($"BloodType_{kit.Blood.Type}");
+            }
+        }
+
+        result.Success = result.MissingPrefabs.Count == 0;
+        if (!result.Success)
+        {
+            result.Error = $"Missing prefabs: {string.Join(", ", result.MissingPrefabs)}";
+        }
+
+        return result;
+    }
+
+    static void ValidateArmorSlot(string? prefab, string slotName, KitPreflightResult result)
+    {
+        if (string.IsNullOrWhiteSpace(prefab))
+            return;
+
+        var guid = PrefabHelper.GetValidPrefabGuidDeep(prefab);
+        if (guid.HasValue)
+        {
+            result.ValidPrefabs.Add(prefab);
+        }
+        else
+        {
+            result.MissingPrefabs.Add(prefab);
+        }
+    }
+
+    /// <summary>
     /// Apply a kit to a player by mode ID.
     /// Uses MutationPipeline with snapshot rollback on failure.
     /// </summary>
@@ -60,75 +195,82 @@ public static class KitController
             return OperationResult.Fail($"Kit not found for mode '{modeId}'");
 
         var snapshot = new PlayerStateController();
-        const int KitRollbackZone = -999;
-        snapshot.SaveSnapshot(playerCharacter, KitRollbackZone);
+        const int KitRollbackZone = PlayerStateController.KitRollbackZoneHash;
+        snapshot.SaveSnapshotIfMissing(playerCharacter, KitRollbackZone);
         var settings = kit.Settings;
 
-        var pipelineResult = MutationPipeline.Run($"KitApply:{modeId}", p =>
-        {
-            if (settings.ClearInventoryFirst)
-            {
-                p.Step("ClearInventory", () =>
-                {
-                    ClearInventory(playerCharacter);
-                });
-            }
+         var pipelineResult = InlinePipeline.Run($"KitApply:{modeId}", p =>
+         {
+             p.Step("ClearAbilityLoadout", () =>
+             {
+                 AbilityController.ClearAbilitySlots(playerCharacter);
+                 AbilityController.ClearPassiveSpells(playerCharacter);
+             });
 
-            if (kit.Armors != null)
-            {
-                p.Step("ApplyArmor", () =>
-                {
-                    ApplyArmor(playerCharacter, kit.Armors);
-                });
-            }
+             if (settings.ClearInventoryFirst)
+             {
+                 p.Step("ClearInventory", () =>
+                 {
+                     ClearInventory(playerCharacter);
+                 });
+             }
 
-            p.Step("ApplyWeapons", () =>
-            {
-                foreach (var weapon in kit.Weapons)
-                    ApplyWeapon(playerCharacter, weapon);
-            });
+             if (kit.Armors != null)
+             {
+                 p.Step("ApplyArmor", () =>
+                 {
+                     ApplyArmor(playerCharacter, kit.Armors);
+                 });
+             }
 
-            p.Step("ApplyItems", () =>
-            {
-                foreach (var item in kit.Items)
-                {
-                    var guid = ResolvePrefab(item.Prefab, "item");
-                    if (guid.HasValue)
-                        playerCharacter.TryGiveItem(guid.Value, item.Amount);
-                }
-            });
+             p.Step("ApplyWeapons", () =>
+             {
+                 foreach (var weapon in kit.Weapons)
+                     ApplyWeapon(playerCharacter, weapon);
+             });
 
-            if (kit.Blood != null)
-            {
-                p.Step("ApplyBlood", () =>
-                {
-                    ApplyBlood(playerCharacter, kit.Blood);
-                });
-            }
+             p.Step("ApplyItems", () =>
+             {
+                 foreach (var item in kit.Items)
+                 {
+                     var granted = TryGiveResolvedItem(playerCharacter, item.Prefab, item.Amount, "item");
+                     if (!granted && item.Required)
+                         throw new InvalidOperationException(
+                             $"Required kit item '{item.Prefab}' could not be granted — snapshot will be restored.");
+                 }
+             });
 
-            if (kit.Abilities != null)
-            {
-                p.Step("ApplyAbilities", () =>
-                {
-                    AbilityController.EquipAbilities(playerCharacter, kit.Abilities);
-                });
-            }
+             if (kit.Blood != null)
+             {
+                 p.Step("ApplyBlood", () =>
+                 {
+                     ApplyBlood(playerCharacter, kit.Blood);
+                 });
+             }
 
-            if (kit.PassiveSpells.Count > 0)
-            {
-                p.Step("ApplyPassiveSpells", () =>
-                {
-                    AbilityController.EquipPassiveSpells(playerCharacter, kit.PassiveSpells);
-                });
-            }
+             if (kit.Abilities != null)
+             {
+                 p.Step("ApplyAbilities", () =>
+                 {
+                     AbilityController.EquipAbilities(playerCharacter, kit.Abilities);
+                 });
+             }
 
-            if (settings.HealOnApply)
-            {
-                p.Step("HealToFull", () =>
-                {
-                    playerCharacter.HealToFull();
-                });
-            }
+             if (kit.PassiveSpells.Count > 0)
+             {
+                 p.Step("ApplyPassiveSpells", () =>
+                 {
+                     AbilityController.EquipPassiveSpells(playerCharacter, kit.PassiveSpells);
+                 });
+             }
+
+             if (settings.HealOnApply)
+             {
+                 p.Step("HealToFull", () =>
+                 {
+                     playerCharacter.HealToFull();
+                 });
+             }
         });
 
         if (!pipelineResult.Success)
@@ -188,12 +330,7 @@ public static class KitController
 
     static void ApplyWeapon(Entity character, WeaponConfig weapon)
     {
-        var guid = ResolvePrefab(weapon.Prefab, "weapon");
-        if (!guid.HasValue) return;
-
-        bool ok = character.TryGiveItem(guid.Value, weapon.Amount);
-        if (!ok)
-            BattleLuckPlugin.LogWarning($"[KitController] TryGiveItem FAILED for weapon {weapon.Prefab} (guid={guid.Value.GuidHash})");
+        TryGiveResolvedItem(character, weapon.Prefab, weapon.Amount, "weapon");
     }
 
     static void ApplyBlood(Entity character, BloodConfig blood)
@@ -220,45 +357,242 @@ public static class KitController
     {
         if (string.IsNullOrEmpty(prefabName)) return;
 
-        var guid = ResolvePrefab(prefabName, slotName);
-        if (!guid.HasValue) return;
+        TryGiveResolvedItem(character, prefabName, 1, slotName);
+    }
 
-        bool ok = character.TryGiveItem(guid.Value, 1);
-        if (!ok)
-            BattleLuckPlugin.LogWarning($"[KitController] TryGiveItem FAILED for {slotName}: {prefabName} (guid={guid.Value.GuidHash})");
+    static bool TryGiveResolvedItem(Entity character, string prefabName, int amount, string context)
+    {
+        if (string.IsNullOrWhiteSpace(prefabName) || amount <= 0)
+            return false;
+
+        var attempted = new HashSet<int>();
+        var attemptedNames = new List<string>();
+
+        foreach (var (candidateName, guid) in ResolveGrantCandidates(prefabName, context).Take(24))
+        {
+            if (guid == PrefabGUID.Empty || !attempted.Add(guid.GuidHash))
+                continue;
+
+            attemptedNames.Add($"{candidateName}({guid.GuidHash})");
+            if (character.TryGiveItem(guid, amount))
+            {
+                if (!candidateName.Equals(prefabName, StringComparison.OrdinalIgnoreCase))
+                    BattleLuckPlugin.LogInfo($"[KitController] Granted {context} '{prefabName}' via compatible live prefab '{candidateName}' ({guid.GuidHash}).");
+                return true;
+            }
+        }
+
+        BattleLuckPlugin.LogWarning($"[KitController] TryGiveItem FAILED for {context}: {prefabName}. Tried {attemptedNames.Count} candidate(s): {string.Join(", ", attemptedNames.Take(6))}");
+        return false;
+    }
+
+    static IEnumerable<(string Name, PrefabGUID Guid)> ResolveGrantCandidates(string prefabName, string context)
+    {
+        if (PrefabHelper.TryGetValidPrefabGuidStrict(prefabName, out var strictGuid))
+        {
+            if (TryNormalizeGrantCandidate(prefabName, strictGuid, context, out var candidate))
+                yield return candidate;
+        }
+
+        if (PrefabHelper.TryGetValidPrefabGuidDeep(prefabName, out var deepGuid))
+        {
+            if (TryNormalizeGrantCandidate(prefabName, deepGuid, context, out var candidate))
+                yield return candidate;
+        }
+
+        foreach (var candidate in FindCompatibleLiveItemCandidates(prefabName, context))
+            yield return candidate;
+    }
+
+    static bool TryNormalizeGrantCandidate(string requestedName, PrefabGUID guid, string context, out (string Name, PrefabGUID Guid) candidate)
+    {
+        var liveName = PrefabHelper.GetLivePrefabName(guid) ?? requestedName;
+        candidate = (liveName, guid);
+
+        if (!IsLikelyGrantableItem(liveName) || !IsCompatibleKitSlot(liveName, requestedName, context))
+        {
+            BattleLuckPlugin.LogWarning($"[KitController] Skipping non-grantable {context} candidate '{liveName}' ({guid.GuidHash}) for '{requestedName}'.");
+            return false;
+        }
+
+        return true;
+    }
+
+    static IEnumerable<(string Name, PrefabGUID Guid)> FindCompatibleLiveItemCandidates(string prefabName, string context)
+    {
+        var requested = prefabName.ToLowerInvariant();
+        var seen = new HashSet<int>();
+        foreach (var kvp in GetCandidateFilters(prefabName, context)
+                     .Where(filter => !string.IsNullOrWhiteSpace(filter))
+                     .SelectMany(PrefabHelper.FindLive)
+                     .Where(kvp => seen.Add(kvp.Value.GuidHash))
+                     .Where(kvp => IsLikelyGrantableItem(kvp.Key))
+                     .Where(kvp => IsCompatibleKitSlot(kvp.Key, prefabName, context))
+                     .OrderByDescending(kvp => ScoreKitCandidate(kvp.Key, requested))
+                     .Take(20))
+        {
+            yield return (kvp.Key, kvp.Value);
+        }
+    }
+
+    static IEnumerable<string> GetCandidateFilters(string prefabName, string context)
+    {
+        var ctx = context.ToLowerInvariant();
+        if (ctx.Contains("chest")) return new[] { "Item_Chest_", "Item_Armor_Chest", "Armor_Chest" };
+        if (ctx.Contains("legs")) return new[] { "Item_Legs_", "Item_Armor_Legs", "Armor_Legs" };
+        if (ctx.Contains("gloves")) return new[] { "Item_Gloves_", "Item_Armor_Gloves", "Armor_Gloves" };
+        if (ctx.Contains("boots")) return new[] { "Item_Boots_", "Item_Armor_Boots", "Armor_Boot", "Boots", "Feet", "Foot" };
+        if (ctx.Contains("cloak")) return new[] { "Item_Cloak", "Cloak" };
+        if (ctx.Contains("headgear") || ctx.Contains("head")) return new[] { "Item_Headgear", "Headgear" };
+        if (ctx.Contains("magicsource") || ctx.Contains("magic")) return new[] { "Item_MagicSource", "MagicSource" };
+        if (ctx.Contains("weapon"))
+        {
+            var marker = "Item_Weapon_";
+            var idx = prefabName.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+            {
+                var rest = prefabName[(idx + marker.Length)..];
+                var end = rest.IndexOf('_');
+                var weaponType = end > 0 ? rest[..end] : rest;
+                return new[] { $"{marker}{weaponType}", $"Weapon_{weaponType}" };
+            }
+            return new[] { marker, "Weapon_" };
+        }
+        var fallback = prefabName.StartsWith("Item_", StringComparison.OrdinalIgnoreCase)
+            ? prefabName.Split('_').Take(3).Aggregate((a, b) => $"{a}_{b}")
+            : prefabName;
+        return new[] { fallback };
+    }
+
+    static bool IsLikelyGrantableItem(string name)
+    {
+        if (!name.StartsWith("Item_", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var blocked = new[]
+        {
+            "Recipe", "Blueprint", "Journal", "Unlock", "Research", "Tech", "DropTable",
+            "VBlood", "Shattered", "Buildable", "CastleHeart"
+        };
+        return !blocked.Any(term => name.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
+    static bool IsCompatibleKitSlot(string liveName, string requestedName, string context)
+    {
+        var ctx = context.ToLowerInvariant();
+        bool Contains(string value) => liveName.Contains(value, StringComparison.OrdinalIgnoreCase);
+        bool ContainsAny(params string[] values) => values.Any(v => liveName.Contains(v, StringComparison.OrdinalIgnoreCase));
+
+        if (ctx.Contains("chest")) return ContainsAny("Chest_", "Armor_Chest");
+        if (ctx.Contains("legs")) return ContainsAny("Legs_", "Armor_Legs");
+        if (ctx.Contains("gloves")) return ContainsAny("Gloves_", "Armor_Gloves");
+        if (ctx.Contains("boots")) return ContainsAny("Boots_", "Armor_Boots");
+        if (ctx.Contains("cloak")) return ContainsAny("Cloak_", "Item_Cloak");
+        if (ctx.Contains("headgear") || ctx.Contains("head")) return ContainsAny("Headgear_", "Item_Headgear");
+        if (ctx.Contains("magicsource") || ctx.Contains("magic"))
+        {
+            if (!Contains("MagicSource")) return false;
+            var school = requestedName.Split('_').FirstOrDefault(part =>
+                part.Equals("Blood", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("Chaos", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("Frost", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("Storm", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("Unholy", StringComparison.OrdinalIgnoreCase) ||
+                part.Equals("Illusion", StringComparison.OrdinalIgnoreCase));
+            return string.IsNullOrWhiteSpace(school) || Contains(school);
+        }
+        if (ctx.Contains("weapon"))
+        {
+            var requestedType = requestedName.Split('_').SkipWhile(part => !part.Equals("Weapon", StringComparison.OrdinalIgnoreCase)).Skip(1).FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(requestedType))
+                return Contains("Weapon_");
+            return Contains($"Weapon_{requestedType}") ||
+                   (requestedType.Equals("Axe", StringComparison.OrdinalIgnoreCase) && Contains("Weapon_Axes")) ||
+                   (requestedType.Equals("Axes", StringComparison.OrdinalIgnoreCase) && Contains("Weapon_Axe"));
+        }
+        return liveName.Contains(requestedName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    static int ScoreKitCandidate(string liveName, string requestedLower)
+    {
+        var lower = liveName.ToLowerInvariant();
+        var score = 0;
+        if (lower.Equals(requestedLower, StringComparison.Ordinal)) score += 1000;
+        if (lower.Contains(requestedLower, StringComparison.Ordinal)) score += 700;
+        if (lower.Contains("t09", StringComparison.Ordinal) || lower.Contains("dracula", StringComparison.Ordinal)) score += 90;
+        if (lower.Contains("t08", StringComparison.Ordinal) || lower.Contains("bloodmoon", StringComparison.Ordinal)) score += 85;
+        if (lower.Contains("sanguine", StringComparison.Ordinal)) score += 75;
+        if (lower.Contains("legendary", StringComparison.Ordinal)) score += 65;
+        if (lower.Contains("epic", StringComparison.Ordinal)) score += 55;
+        if (lower.Contains("merciless", StringComparison.Ordinal)) score += 35;
+        if (lower.Contains("broken", StringComparison.Ordinal) || lower.Contains("shattered", StringComparison.Ordinal)) score -= 150;
+        return score;
     }
 
     /// <summary>
-    /// Resolve a prefab name using both Prefabs.cs AND live game data.
-    /// Validates the resolved GUID exists in the game's entity map.
+    /// Apply a kit to a player with a specified mode.
+    /// FullLoadout: replaces entire loadout (clear inventory, apply blood, abilities, etc.).
+    /// AdditiveReward: grants only items without clearing inventory or modifying other state.
     /// </summary>
-    static PrefabGUID? ResolvePrefab(string prefabName, string context)
+    public static OperationResult ApplyKit(Entity playerCharacter, string modeId, KitApplyMode mode)
     {
-        // Try strict exact match first
-        if (PrefabHelper.TryGetValidPrefabGuidStrict(prefabName, out var strictGuid))
-            return strictGuid;
+        var kit = LoadKit(modeId);
+        if (kit == null)
+            return OperationResult.Fail($"Kit not found for mode '{modeId}'");
 
-        // Fall back to deep lookup (expanded candidates)
-        var guid = PrefabHelper.GetValidPrefabGuidDeep(prefabName);
-        if (guid.HasValue)
+        if (mode == KitApplyMode.FullLoadout)
+            return ApplyKit(playerCharacter, modeId);
+
+        // AdditiveReward mode: skip inventory clear, blood, and abilities
+        var pipelineResult = InlinePipeline.Run($"KitAdditive:{modeId}", p =>
         {
-            BattleLuckPlugin.LogInfo($"[KitController] Resolved {context} '{prefabName}' via deep lookup -> guid {guid.Value.GuidHash}");
-            return guid.Value;
+            if (kit.Armors != null)
+            {
+                p.Step("ApplyArmor", () =>
+                {
+                    ApplyArmor(playerCharacter, kit.Armors);
+                });
+            }
+
+            p.Step("ApplyWeapons", () =>
+            {
+                foreach (var weapon in kit.Weapons)
+                    ApplyWeapon(playerCharacter, weapon);
+            });
+
+            p.Step("ApplyItems", () =>
+            {
+                foreach (var item in kit.Items)
+                {
+                    var granted = TryGiveResolvedItem(playerCharacter, item.Prefab, item.Amount, "item");
+                    if (!granted && item.Required)
+                        throw new InvalidOperationException(
+                            $"Required kit item '{item.Prefab}' could not be granted — additive reward aborted.");
+                }
+            });
+        });
+
+        if (!pipelineResult.Success)
+        {
+            BattleLuckPlugin.LogWarning(
+                $"[KitController] Additive kit apply failed for {modeId} at step '{pipelineResult.FailedStep}': {pipelineResult.Error}"
+            );
+            return OperationResult.Fail(
+                $"Additive kit apply failed at step '{pipelineResult.FailedStep}': {pipelineResult.Error}"
+            );
         }
 
-        BattleLuckPlugin.LogWarning($"[KitController] Unknown {context} prefab: {prefabName} — not found in strict or deep lookup.");
-        return null;
+        BattleLuckPlugin.LogInfo(
+            $"[KitController] Additive kit '{modeId}' applied to {playerCharacter.GetSteamId()} with {pipelineResult.Steps.Count} steps."
+        );
+
+        return OperationResult.Ok();
     }
 
-    // ── Backward compatibility shims ────────────────────────────────────
-
-    /// <summary>Apply full kit using "bloodbath" as default (backward compat).</summary>
     public static void ApplyFullKit(Entity playerCharacter) => ApplyKit(playerCharacter, "bloodbath");
 
-    /// <summary>Set equipment level to max (90).</summary>
     public static void SetMaxLevel(Entity playerCharacter) => playerCharacter.SetEquipmentLevel(90f, 90f, 90f);
 
-    /// <summary>Apply only weapons from the default kit.</summary>
     public static void ApplyWeaponsKit(Entity playerCharacter)
     {
         var kit = LoadKit("bloodbath");
@@ -270,7 +604,6 @@ public static class KitController
         }
     }
 
-    /// <summary>Apply only armor from the default kit.</summary>
     public static void ApplyArmorKit(Entity playerCharacter)
     {
         var kit = LoadKit("bloodbath");
@@ -278,7 +611,6 @@ public static class KitController
         if (kit.Armors != null) ApplyArmor(playerCharacter, kit.Armors);
     }
 
-    /// <summary>Get all item prefabs from a kit (for inventory clearing).</summary>
     public static List<PrefabGUID> GetKitPrefabs(string kitId = "bloodbath")
     {
         var kit = LoadKit(kitId);
@@ -307,6 +639,40 @@ public static class KitController
             if (g.HasValue) result.Add(g.Value);
         }
         return result;
+    }
+
+    /// <summary>Remove event-kit items, ability overrides, and configured passive buffs.</summary>
+    public static int RemoveEventKit(Entity playerCharacter, string kitId)
+    {
+        var removed = 0;
+        foreach (var prefab in GetKitPrefabs(kitId).Distinct())
+        {
+            try
+            {
+                if (playerCharacter.TryRemoveItem(prefab, 999))
+                    removed++;
+            }
+            catch { }
+        }
+
+        removed += AbilityController.ClearAbilitySlots(playerCharacter);
+
+        var kit = LoadKit(kitId);
+        if (kit != null)
+        {
+            foreach (var passive in kit.PassiveSpells)
+            {
+                var guid = PrefabHelper.GetPrefabGuidDeep(passive.Prefab);
+                if (guid.HasValue && playerCharacter.HasBuff(guid.Value))
+                {
+                    playerCharacter.TryRemoveBuff(guid.Value);
+                    removed++;
+                }
+            }
+        }
+
+        BattleLuckPlugin.LogInfo($"[KitController] Removed event kit '{kitId}' from {playerCharacter.GetSteamId()} ({removed} loadout entries).");
+        return removed;
     }
 
     static void AddIfResolved(List<PrefabGUID> list, string? name)

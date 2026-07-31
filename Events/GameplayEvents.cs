@@ -156,6 +156,22 @@ public sealed class PlayerLeftEvent
     public string ModeId { get; init; } = "";
 }
 
+// ── Blood Frenzy ──
+public sealed class BloodFrenzyActivatedEvent
+{
+    public string SessionId { get; init; } = "";
+    public ulong SteamId { get; init; }
+    public int StreakCount { get; init; }
+}
+
+public sealed class BloodFrenzyBountyEvent
+{
+    public string SessionId { get; init; } = "";
+    public ulong KillerSteamId { get; init; }
+    public ulong VictimSteamId { get; init; }
+    public int BountyPoints { get; init; }
+}
+
 // ── ELO ──
 public sealed class EloUpdateEvent
 {

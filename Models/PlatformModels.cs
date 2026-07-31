@@ -7,7 +7,7 @@ public sealed class MovingPlatformConfig
     public bool Enabled { get; set; }
 
     [JsonPropertyName("tilePrefab")]
-    public string TilePrefab { get; set; } = "TM_Castle_Wall_Tier02_Stone";
+    public string TilePrefab { get; set; } = "TM_Castle_Floor_Tier02_Stone";
 
     [JsonPropertyName("gridSize")]
     public int GridSize { get; set; } = 5;
